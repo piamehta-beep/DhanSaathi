@@ -7,6 +7,7 @@ from app.config import settings
 from app.database.connection import get_db
 from app.database.models import Customer
 from app.models.survival import predict_distress
+from app.schemas import DistressRiskResponse
 from app.services.consent_guard import (
     SCOPE_CREDIT_ASSESSMENT,
     SCOPE_TRANSACTION_ANALYSIS,
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/api/v1/customers", tags=["distress-risk"])
 
 @router.get(
     "/{customer_id}/distress-risk",
+    response_model=DistressRiskResponse,
     dependencies=[
         Depends(require_consent(SCOPE_TRANSACTION_ANALYSIS, SCOPE_CREDIT_ASSESSMENT))
     ],

@@ -3,6 +3,11 @@ import uuid
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from app.schemas import (
+    OnboardingMessageResponse,
+    OnboardingStartResponse,
+    OnboardingStateResponse,
+)
 from app.services.onboarding import OnboardingSession, advance
 
 router = APIRouter(prefix="/api/v1/onboarding", tags=["onboarding"])
@@ -24,7 +29,7 @@ class MessageRequest(BaseModel):
     message: str
 
 
-@router.post("/start", status_code=200)
+@router.post("/start", status_code=200, response_model=OnboardingStartResponse)
 def start(req: StartRequest):
     session_id = str(uuid.uuid4())
     session = OnboardingSession(
@@ -41,7 +46,7 @@ def start(req: StartRequest):
     }
 
 
-@router.post("/{session_id}/message")
+@router.post("/{session_id}/message", response_model=OnboardingMessageResponse)
 def message(session_id: str, req: MessageRequest):
     session = _sessions.get(session_id)
     if not session:
@@ -49,7 +54,7 @@ def message(session_id: str, req: MessageRequest):
     return advance(session, req.message)
 
 
-@router.get("/{session_id}")
+@router.get("/{session_id}", response_model=OnboardingStateResponse)
 def get_session(session_id: str):
     session = _sessions.get(session_id)
     if not session:

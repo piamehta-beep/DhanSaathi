@@ -9,6 +9,7 @@ from app.database.models import Anomaly, Customer
 from app.features.context import build_context
 from app.features.pipeline import compute_features
 from app.models.anomaly import score_transactions
+from app.schemas import AnomalyListResponse
 from app.services.consent_guard import SCOPE_ANOMALY_MONITORING, require_consent
 
 router = APIRouter(prefix="/api/v1/customers", tags=["anomalies"])
@@ -16,6 +17,7 @@ router = APIRouter(prefix="/api/v1/customers", tags=["anomalies"])
 
 @router.get(
     "/{customer_id}/anomalies",
+    response_model=AnomalyListResponse,
     dependencies=[Depends(require_consent(SCOPE_ANOMALY_MONITORING))],
 )
 def get_anomalies(

@@ -11,6 +11,7 @@ from app.services.consent_guard import (
     SCOPE_TRANSACTION_ANALYSIS,
     require_consent,
 )
+from app.schemas import EnquiryResponse
 from app.services.product_enquiry import evaluate_enquiry
 
 router = APIRouter(prefix="/api/v1/customers", tags=["enquiry"])
@@ -24,6 +25,7 @@ class EnquiryRequest(BaseModel):
 
 @router.post(
     "/{customer_id}/enquire",
+    response_model=EnquiryResponse,
     dependencies=[
         Depends(require_consent(SCOPE_TRANSACTION_ANALYSIS, SCOPE_CREDIT_ASSESSMENT))
     ],

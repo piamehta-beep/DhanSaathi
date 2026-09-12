@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.schemas import HealthResponse
 from app.database.connection import get_db
 from app.routers import (
     anomalies,
@@ -61,7 +62,7 @@ def _on_startup() -> None:
         start_warmup()
 
 
-@app.get("/api/v1/health")
+@app.get("/api/v1/health", response_model=HealthResponse, tags=["health"])
 def health(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))

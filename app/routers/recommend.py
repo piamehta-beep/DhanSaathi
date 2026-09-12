@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.database.models import Customer, Recommendation
 from app.models.recommender import match_bank_products
+from app.schemas import MatchingProductsResponse, RecommendationResponse
 from app.services.consent_guard import (
     SCOPE_PRODUCT_RECOMMENDATION,
     SCOPE_TRANSACTION_ANALYSIS,
@@ -28,6 +29,7 @@ def _public(result: dict) -> dict:
 
 @router.post(
     "/{customer_id}/recommend",
+    response_model=RecommendationResponse,
     dependencies=[
         Depends(require_consent(SCOPE_TRANSACTION_ANALYSIS, SCOPE_PRODUCT_RECOMMENDATION))
     ],
@@ -49,6 +51,7 @@ def create_recommendation(
 
 @router.get(
     "/{customer_id}/matching-products/{recommendation_id}",
+    response_model=MatchingProductsResponse,
     dependencies=[
         Depends(require_consent(SCOPE_TRANSACTION_ANALYSIS, SCOPE_PRODUCT_RECOMMENDATION))
     ],

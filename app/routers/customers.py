@@ -9,12 +9,18 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.database.models import Customer, Transaction
-from app.features.pipeline import compute_features
+from app.features.summary import list_summary_metrics
+from app.schemas import (
+    CustomerDetail,
+    CustomerListResponse,
+    TransactionCreated,
+    TransactionListResponse,
+)
 
 router = APIRouter(prefix="/api/v1/customers", tags=["customers"])
 
 
-@router.get("")
+@router.get("", response_model=CustomerListResponse)
 def list_customers(
     persona: str | None = None,
     limit: int = Query(50, le=500),
@@ -27,15 +33,18 @@ def list_customers(
     total = q.count()
     customers = q.order_by(Customer.external_id).offset(offset).limit(limit).all()
 
+    # Summary metrics come from two bulk aggregates rather than running the
+    # feature pipeline per row. Computing full features for a 50-row page
+    # meant ~50x the queries and over a second of latency on what is the
+    # app's most-visited screen. These reproduce the pipeline's DBR and
+    # runway definitions exactly — see list_summary_metrics.
+    metrics = list_summary_metrics(db, [c.id for c in customers])
+
     out = []
     for c in customers:
-        try:
-            features = compute_features(db, c.id, persist=False)
-            dbr = features.get("dbr")
-            runway = features.get("liquidity_runway")
-        except Exception:
-            dbr = None
-            runway = None
+        summary = metrics.get(c.id, {})
+        dbr = summary.get("dbr")
+        runway = summary.get("liquidity_runway")
         out.append({
             "id": str(c.id),
             "persona": c.persona,
@@ -52,7 +61,7 @@ def list_customers(
     return {"customers": out, "total": total, "limit": limit, "offset": offset}
 
 
-@router.get("/{customer_id}")
+@router.get("/{customer_id}", response_model=CustomerDetail)
 def get_customer(customer_id: uuid.UUID, db: Session = Depends(get_db)):
     c = db.query(Customer).filter(Customer.id == customer_id).first()
     if not c:
@@ -79,7 +88,7 @@ def get_customer(customer_id: uuid.UUID, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/{customer_id}/transactions")
+@router.get("/{customer_id}/transactions", response_model=TransactionListResponse)
 def get_transactions(
     customer_id: uuid.UUID,
     start_date: dt.date | None = None,
@@ -134,7 +143,7 @@ class NewTransaction(BaseModel):
     is_recurring: bool = False
 
 
-@router.post("/{customer_id}/transactions", status_code=201)
+@router.post("/{customer_id}/transactions", status_code=201, response_model=TransactionCreated)
 def create_transaction(
     customer_id: uuid.UUID, txn: NewTransaction, db: Session = Depends(get_db)
 ):

@@ -12,6 +12,7 @@ from app.features.pipeline import compute_features
 from app.models.cashflow_sim import run_simulation
 from app.models.confidence import bootstrap_shortfall_ci
 from app.safety.affordability import compute_emi
+from app.schemas import SimulateResponse
 
 router = APIRouter(prefix="/api/v1/customers", tags=["simulation"])
 
@@ -29,7 +30,7 @@ class SimulateRequest(BaseModel):
 SCENARIO_EMI = {"baseline": 0.0, "wait": 0.0}
 
 
-@router.post("/{customer_id}/simulate")
+@router.post("/{customer_id}/simulate", response_model=SimulateResponse)
 def simulate(customer_id: uuid.UUID, req: SimulateRequest, db: Session = Depends(get_db)):
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
     if not customer:
