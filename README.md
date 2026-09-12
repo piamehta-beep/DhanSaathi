@@ -90,13 +90,14 @@ python3.12 -m venv .venv && source .venv/bin/activate && pip install -r requirem
 ```
 
 ```bash
-cp .env.example .env && alembic upgrade head
+cp .env.example .env && source .venv/bin/activate && alembic upgrade head
 ```
 
 Seed the data (~7 minutes for the full 1,000 customers):
 
 ```bash
-python -m app.synthetic_data.seed --n 1000 --seed 42 \
+source .venv/bin/activate \
+  && python -m app.synthetic_data.seed --n 1000 --seed 42 \
   && python -m app.synthetic_data.seed_bank_products \
   && python -m app.synthetic_data.seed_consent
 ```
@@ -105,10 +106,11 @@ The consent step matters: endpoints that read customer data are consent-gated
 and return **403** without it. Set `ENFORCE_CONSENT=false` in `.env` to bypass
 that while debugging.
 
-Run the API:
+Run the API — **activate the venv first**, in every new terminal, or the
+system Python runs instead and fails with `ModuleNotFoundError: sqlalchemy`:
 
 ```bash
-uvicorn app.main:app --reload --port 8010
+source .venv/bin/activate && uvicorn app.main:app --reload --port 8010
 ```
 
 Then open **http://localhost:8010/ui/** for the review surface, or
@@ -120,6 +122,7 @@ Every endpoint declares a typed response schema, so a client can be generated
 straight from the spec:
 
 ```bash
+# run this from your FRONTEND project, not from this repo
 npx openapi-typescript http://localhost:8010/openapi.json -o src/api-types.ts
 ```
 
@@ -152,14 +155,14 @@ pays the training cost. Disable with `WARM_MODELS_ON_STARTUP=false`.
 ### Validation
 
 ```bash
-pytest tests/ -q
+source .venv/bin/activate && pytest tests/ -q
 ```
 
 The full Section 9.3 sweep across all 1,000 customers is slower and lives
 outside the test loop:
 
 ```bash
-python -m scripts.full_sweep
+source .venv/bin/activate && python -m scripts.full_sweep
 ```
 
 ---
