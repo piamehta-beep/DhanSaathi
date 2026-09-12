@@ -32,15 +32,27 @@ FEATURE_VECTOR_ORDER = [
 ]
 
 
-def compute_features(db: Session, customer_id, snapshot_date: dt.date | None = None, persist: bool = True) -> dict:
-    features, _ = compute_features_with_snapshot_date(db, customer_id, snapshot_date, persist)
+def compute_features(
+    db: Session,
+    customer_id,
+    snapshot_date: dt.date | None = None,
+    persist: bool = True,
+    lookback_months: int | None = None,
+) -> dict:
+    features, _ = compute_features_with_snapshot_date(
+        db, customer_id, snapshot_date, persist, lookback_months
+    )
     return features
 
 
 def compute_features_with_snapshot_date(
-    db: Session, customer_id, snapshot_date: dt.date | None = None, persist: bool = True
+    db: Session,
+    customer_id,
+    snapshot_date: dt.date | None = None,
+    persist: bool = True,
+    lookback_months: int | None = None,
 ) -> tuple[dict, dt.date]:
-    ctx = build_context(db, customer_id, snapshot_date)
+    ctx = build_context(db, customer_id, snapshot_date, lookback_months)
 
     features: dict = {}
     features.update(compute_income_features(ctx))

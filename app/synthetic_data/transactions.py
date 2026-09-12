@@ -251,9 +251,6 @@ def generate_transactions(rng: np.random.Generator, profile: dict) -> tuple[list
                     "is_recurring": False, "is_anomaly": False, "anomaly_type": None,
                 })
 
-        if profile["persona"] == "distressed" and income_anomaly == "income_drop":
-            pass  # handled on the salary credit above
-
         medical_window = profile.get("medical_emergency_window")
         if profile["persona"] == "distressed" and medical_window and medical_window[0] <= month_idx <= medical_window[1]:
             if month_idx == medical_window[0]:

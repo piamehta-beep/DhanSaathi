@@ -12,6 +12,7 @@ import datetime as dt
 from dataclasses import dataclass
 
 import pandas as pd
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database.models import Customer, RecurringObligation, Transaction
@@ -31,12 +32,36 @@ def _month_key(d: dt.date) -> str:
     return f"{d.year:04d}-{d.month:02d}"
 
 
-def build_context(db: Session, customer_id, snapshot_date: dt.date | None = None) -> FeatureContext:
+def build_context(
+    db: Session,
+    customer_id,
+    snapshot_date: dt.date | None = None,
+    lookback_months: int | None = None,
+) -> FeatureContext:
+    """Load a customer's data as of `snapshot_date`.
+
+    `lookback_months` bounds how far back the window reaches. It exists so a
+    model can be trained and served on the *same* window length: features like
+    income_cv or a trend slope computed over 6 months are not on the same scale
+    as the same feature computed over 18, and a model trained on one and served
+    the other produces out-of-distribution inputs.
+    """
     customer = db.query(Customer).filter(Customer.id == customer_id).one()
 
     txns_q = db.query(Transaction).filter(Transaction.customer_id == customer_id)
     if snapshot_date is not None:
         txns_q = txns_q.filter(Transaction.txn_date <= snapshot_date)
+    if lookback_months is not None:
+        anchor = snapshot_date or db.query(func.max(Transaction.txn_date)).filter(
+            Transaction.customer_id == customer_id
+        ).scalar()
+        if anchor is not None:
+            start_month = anchor.month - (lookback_months - 1)
+            start_year = anchor.year
+            while start_month <= 0:
+                start_month += 12
+                start_year -= 1
+            txns_q = txns_q.filter(Transaction.txn_date >= dt.date(start_year, start_month, 1))
     txns = txns_q.order_by(Transaction.txn_date).all()
 
     rows = [{

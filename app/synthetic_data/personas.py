@@ -156,7 +156,7 @@ def generate_customer(rng: np.random.Generator, persona_name: str, external_id: 
     monthly_expenses_approx = income_mean * (1 - savings_rate)
     liquid_savings = float(max(0.0, runway_months * monthly_expenses_approx))
 
-    city, state = cfg_city = CITIES[rng.integers(0, len(CITIES))]
+    city, state = CITIES[rng.integers(0, len(CITIES))]
     name = f"{FIRST_NAMES[rng.integers(0, len(FIRST_NAMES))]} {LAST_NAMES[rng.integers(0, len(LAST_NAMES))]}"
 
     seasonality_lo, seasonality_hi = cfg["seasonality"]

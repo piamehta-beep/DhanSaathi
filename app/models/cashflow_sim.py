@@ -64,28 +64,41 @@ def seasonal_multipliers(monthly: pd.DataFrame) -> dict[int, float]:
     return {m: float(by_month.get(m, overall_mean) / overall_mean) for m in range(1, 13)}
 
 
-def _sample_income_path(
+def _sample_income_paths(
     method: str,
     income_series: np.ndarray,
     ou_params: dict,
+    n_paths: int,
     months_projected: int,
     rng: np.random.Generator,
 ) -> np.ndarray:
-    path = np.empty(months_projected)
-    i_prev = income_series[-1] if len(income_series) > 0 else ou_params["mu"]
+    """All Monte Carlo income paths at once as an (n_paths, months) array.
+
+    Vectorized across paths: the recursion is inherently sequential in t (each
+    month depends on the previous one, and the non-negativity clamp is
+    path-dependent so it cannot be replaced by a cumulative sum), but every
+    path advances simultaneously. That makes this O(months) numpy operations
+    rather than O(n_paths * months) Python iterations, which matters because
+    the recommender runs one simulation per candidate product in its grid.
+    """
+    paths = np.empty((n_paths, months_projected))
+    start = income_series[-1] if len(income_series) > 0 else ou_params["mu"]
+    i_prev = np.full(n_paths, float(start))
 
     if method == "bootstrap" and len(income_series) >= 2:
         deltas = np.diff(income_series)
+        draws = rng.choice(deltas, size=(n_paths, months_projected), replace=True)
         for t in range(months_projected):
-            i_prev = max(i_prev + rng.choice(deltas), 0.0)
-            path[t] = i_prev
+            i_prev = np.maximum(i_prev + draws[:, t], 0.0)
+            paths[:, t] = i_prev
     else:
         mu, sigma, theta = ou_params["mu"], ou_params["sigma"], ou_params["theta"]
+        eps = rng.normal(size=(n_paths, months_projected))
         for t in range(months_projected):
-            i_prev = max(i_prev + theta * (mu - i_prev) + sigma * rng.normal(), 0.0)
-            path[t] = i_prev
+            i_prev = np.maximum(i_prev + theta * (mu - i_prev) + sigma * eps[:, t], 0.0)
+            paths[:, t] = i_prev
 
-    return path
+    return paths
 
 
 def run_simulation(
@@ -114,24 +127,20 @@ def run_simulation(
     sigma_d = max(expense_volatility * monthly_discretionary_mean, 1.0)
     mu_d = max(monthly_discretionary_mean, 1.0)
 
-    liquidity_paths = np.empty((n_paths, months_projected))
-    shortfall_paths = np.zeros((n_paths, months_projected), dtype=bool)
+    income_paths = _sample_income_paths(method, income_series, ou_params, n_paths, months_projected, rng)
 
-    for p in range(n_paths):
-        income_path = _sample_income_path(method, income_series, ou_params, months_projected, rng)
-        l_prev = liquid_savings
-        for t in range(months_projected):
-            calendar_month = ((start_calendar_month - 1 + t) % 12) + 1
-            multiplier = s_m.get(calendar_month, 1.0)
+    calendar_months = ((start_calendar_month - 1 + np.arange(months_projected)) % 12) + 1
+    multipliers = np.array([max(s_m.get(int(m), 1.0), 0.05) for m in calendar_months])
+    log_means = np.log(mu_d * multipliers)
+    log_sigma = max(min(sigma_d / mu_d, 2.0), 0.05)
 
-            log_mean = np.log(mu_d * max(multiplier, 0.05))
-            log_sigma = min(sigma_d / mu_d, 2.0) if mu_d > 0 else 0.3
-            v_t = rng.lognormal(mean=log_mean, sigma=max(log_sigma, 0.05))
+    variable_expenses = rng.lognormal(
+        mean=log_means, sigma=log_sigma, size=(n_paths, months_projected)
+    )
 
-            total_expense = fixed_expenses + v_t
-            l_prev = l_prev + income_path[t] - total_expense
-            liquidity_paths[p, t] = l_prev
-            shortfall_paths[p, t] = l_prev < min_buffer
+    net_flow = income_paths - (fixed_expenses + variable_expenses)
+    liquidity_paths = liquid_savings + np.cumsum(net_flow, axis=1)
+    shortfall_paths = liquidity_paths < min_buffer
 
     any_shortfall = shortfall_paths.any(axis=1)
     p_shortfall_12m = float(any_shortfall.mean())

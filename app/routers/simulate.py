@@ -1,5 +1,6 @@
 import uuid
 
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -37,7 +38,7 @@ def simulate(customer_id: uuid.UUID, req: SimulateRequest, db: Session = Depends
     ctx = build_context(db, customer_id)
     features = compute_features(db, customer_id, persist=False)
 
-    income_series = ctx.monthly["income"].to_numpy() if not ctx.monthly.empty else __import__("numpy").array([])
+    income_series = ctx.monthly["income"].to_numpy() if not ctx.monthly.empty else np.array([])
     fixed_non_emi = float(
         (ctx.monthly["expenses"] - ctx.monthly["discretionary"] - ctx.monthly["emi"]).mean()
     ) if not ctx.monthly.empty else 0.0
