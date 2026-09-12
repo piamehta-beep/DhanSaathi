@@ -121,6 +121,10 @@ export function Home() {
                 <Card className="flex flex-col gap-4 animate-rise">
                   <SurvivalCurve points={d.survival_function} />
                   {d.median_survival_time_months != null && <p className="text-sm text-care-ink">{t("home.survival.median", { months: formatMonths(d.median_survival_time_months) })}</p>}
+                  <div className="rounded-xl bg-sand px-3 py-2 text-sm">
+                    <p className="font-semibold">{t("home.twoModels", { a: formatPct(d.distress_probability_12m), b: formatPct(d.fallback_model.distress_probability_12m) })}</p>
+                    <p className="text-ink-soft">{t("home.twoModelsLead")}</p>
+                  </div>
                   {hazards.length > 0 && (
                     <div className="flex flex-col gap-2">
                       <h3 className="text-sm font-semibold text-ink-mute">{t("home.drivers.title")}</h3>

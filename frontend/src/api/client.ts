@@ -31,6 +31,8 @@ export type TransactionListResponse = S["TransactionListResponse"];
 export type TransactionItem = S["TransactionItem"];
 export type AuditLogResponse = S["AuditLogResponse"];
 export type AuditLogItem = S["AuditLogItem"];
+export type NewTransaction = S["NewTransaction"];
+export type TransactionCreated = S["TransactionCreated"];
 
 const BASE = ((import.meta.env.VITE_API_BASE as string | undefined) ?? "").replace(/\/$/, "");
 const API = `${BASE}/api/v1`;
@@ -100,6 +102,12 @@ export const api = {
     request<SimulateResponse>(`/customers/${id}/simulate`, { method: "POST", body: JSON.stringify(body) }),
   transactions: (id: string, params: { category?: string; limit?: number; offset?: number; start_date?: string; end_date?: string }) =>
     request<TransactionListResponse>(`/customers/${id}/transactions${q(params)}`),
+  createTransaction: (id: string, body: NewTransaction) =>
+    request<TransactionCreated>(`/customers/${id}/transactions`, { method: "POST", body: JSON.stringify(body) }),
+  recommendWithLLM: (id: string, language: string) =>
+    request<RecommendationResponse>(`/customers/${id}/recommend`, {
+      method: "POST", body: JSON.stringify({ language, include_llm_explanation: true }),
+    }),
   audit: (id: string, params: { action?: string; limit?: number; offset?: number }) =>
     request<AuditLogResponse>(`/audit/${id}${q(params)}`),
 

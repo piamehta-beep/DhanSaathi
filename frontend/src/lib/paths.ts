@@ -1,6 +1,7 @@
 export const paths = {
   welcome: "/",
   onboarding: "/start",
+  about: "/how-it-works",
   home: (id: string) => `/c/${id}`,
   suggest: (id: string) => `/c/${id}/suggest`,
   banks: (id: string) => `/c/${id}/banks`,

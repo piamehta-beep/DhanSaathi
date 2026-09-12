@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { ArrowRight, Sparkles, ChevronDown, Search } from "lucide-react";
+import { ArrowRight, Sparkles, ChevronDown, Search, Info } from "lucide-react";
 import { useQueries } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { keys, retryPolicy, useCustomerPage } from "@/api/queries";
@@ -68,9 +68,14 @@ export function Welcome() {
 
         <Browser />
 
-        <Link to={paths.onboarding} className="inline-flex min-h-touch items-center gap-2 self-start rounded-xl px-1 font-semibold text-accent-strong hover:underline">
-          <Sparkles size={20} aria-hidden /> {t("welcome.newLink")}
-        </Link>
+        <div className="flex flex-wrap gap-x-6 gap-y-1">
+          <Link to={paths.onboarding} className="inline-flex min-h-touch items-center gap-2 rounded-xl px-1 font-semibold text-accent-strong hover:underline">
+            <Sparkles size={20} aria-hidden /> {t("welcome.newLink")}
+          </Link>
+          <Link to={paths.about} className="inline-flex min-h-touch items-center gap-2 rounded-xl px-1 font-semibold text-accent-strong hover:underline">
+            <Info size={20} aria-hidden /> {t("about.link")}
+          </Link>
+        </div>
         <p className="text-sm text-ink-mute">{t("welcome.demoNote")}</p>
       </div>
     </Layout>

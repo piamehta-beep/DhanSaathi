@@ -1,7 +1,10 @@
 import { useTranslation } from "react-i18next";
 import { useParams, Link } from "react-router-dom";
 import { HelpCircle, Landmark, Search, Shield, Sparkles, Leaf, TrendingUp, ScrollText } from "lucide-react";
-import { useRecommendation } from "@/api/queries";
+import { useRecommendation, useLLMExplanation } from "@/api/queries";
+import { useState } from "react";
+import { Button } from "@/ui";
+import { MessageSquareText } from "lucide-react";
 import type { RecommendationResponse } from "@/api/client";
 import { recommendMode, vetoKey, vetoNextKey, KNOWN_VETOS, confidenceKey } from "@/copy/mapping";
 import { paths } from "@/lib/paths";
@@ -214,10 +217,40 @@ function Depth({ r, customerId }: { r: RecommendationResponse; customerId: strin
           </ul>
         </Card>
       )}
+      <LLMWording customerId={customerId} />
       <Link to={paths.trail(customerId)} className="inline-flex min-h-touch items-center gap-2 text-sm font-semibold text-ink-soft underline-offset-4 hover:underline sm:col-span-2">
         <ScrollText size={18} aria-hidden /> {t("rec.trail")}
       </Link>
     </div>
+  );
+}
+
+// The optional LLM layer, exposed honestly: it runs after the decision is
+// frozen, and when it's off the API says why.
+function LLMWording({ customerId }: { customerId: string }) {
+  const { t, i18n } = useTranslation();
+  const [asked, setAsked] = useState(false);
+  const q = useLLMExplanation(customerId, i18n.language === "en" ? "en" : "hi", asked);
+  const status = q.data?.llm_status ?? null;
+  const text = q.data?.llm_explanation ?? null;
+  const statusKey = status === "disabled_by_data_locality_policy" || status === "no_api_key_configured" ? `rec.llm.${status}` : status?.startsWith("llm_call_failed") ? "rec.llm.failed" : null;
+  return (
+    <Card className="flex flex-col gap-3 sm:col-span-2">
+      <h2 className="font-bold">{t("rec.llm.title")}</h2>
+      {!asked ? (
+        <Button onClick={() => setAsked(true)} icon={<MessageSquareText size={20} aria-hidden />}>{t("rec.llm.button")}</Button>
+      ) : q.isPending ? (
+        <p className="text-ink-soft" role="status">{t("rec.llm.loading")}</p>
+      ) : text ? (
+        <>
+          <p className="text-lg">{text}</p>
+          <StatusChip light="neutral">{t("rec.llm.generated")}</StatusChip>
+        </>
+      ) : (
+        <p className="text-ink-soft">{statusKey ? t(statusKey) : t("rec.llm.failed")}</p>
+      )}
+      <p className="text-sm text-ink-mute">{t("rec.llm.note")}</p>
+    </Card>
   );
 }
 

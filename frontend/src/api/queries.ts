@@ -85,10 +85,15 @@ export const useExplain = (id: string, rec: string | undefined) =>
 
 // Monte Carlo runs are deterministic (seed 42) so they cache well per input.
 export type LoanScenario = { amount: number; tenure: number; rate: number } | null;
-export const useSimulation = (id: string, loan: LoanScenario, enabled = true) => {
-  const body = loan
-    ? { scenarios: ["baseline", "take_loan", "smaller_loan"], loan_amount: loan.amount, loan_tenure_months: loan.tenure, loan_interest_rate: loan.rate }
-    : { scenarios: ["baseline"] };
+export type SimOptions = { months?: number; paths?: number };
+export const useSimulation = (id: string, loan: LoanScenario, enabled = true, opts: SimOptions = {}) => {
+  const body = {
+    ...(loan
+      ? { scenarios: ["baseline", "take_loan", "smaller_loan"], loan_amount: loan.amount, loan_tenure_months: loan.tenure, loan_interest_rate: loan.rate }
+      : { scenarios: ["baseline"] }),
+    ...(opts.months ? { months_projected: opts.months } : {}),
+    ...(opts.paths ? { n_paths: opts.paths } : {}),
+  };
   return useQuery({
     queryKey: keys.simulate(id, JSON.stringify(body)),
     queryFn: () => api.simulate(id, body),
@@ -98,10 +103,10 @@ export const useSimulation = (id: string, loan: LoanScenario, enabled = true) =>
   });
 };
 
-export const useTransactions = (id: string, category: string, offset: number, limit = 40) =>
+export const useTransactions = (id: string, category: string, offset: number, limit = 40, startDate?: string) =>
   useQuery({
-    queryKey: [...keys.transactions(id, category, offset), limit],
-    queryFn: () => api.transactions(id, { category: category === "all" ? undefined : category, limit, offset }),
+    queryKey: [...keys.transactions(id, category, offset), limit, startDate ?? ""],
+    queryFn: () => api.transactions(id, { category: category === "all" ? undefined : category, limit, offset, start_date: startDate }),
     retry: retryPolicy,
     placeholderData: (prev) => prev,
   });
@@ -109,10 +114,10 @@ export const useTransactions = (id: string, category: string, offset: number, li
 export const useAllAnomalies = (id: string) =>
   useQuery({ queryKey: ["anomalies-all", id], queryFn: () => api.anomalies(id, { min_score: 0.5, limit: 50 }), retry: retryPolicy });
 
-export const useAudit = (id: string, offset: number, limit = 25) =>
+export const useAudit = (id: string, offset: number, limit = 25, action?: string) =>
   useQuery({
-    queryKey: [...keys.audit(id, offset), limit],
-    queryFn: () => api.audit(id, { limit, offset }),
+    queryKey: [...keys.audit(id, offset), limit, action ?? ""],
+    queryFn: () => api.audit(id, { limit, offset, action }),
     retry: retryPolicy,
     placeholderData: (prev) => prev,
   });
@@ -125,6 +130,32 @@ export const useCustomerPage = (persona: string | undefined, offset: number, lim
     staleTime: 10 * 60_000,
     placeholderData: (prev) => prev,
   });
+
+// Optional LLM wording; a separate key so the structured recommendation
+// (and its recommendation_id) is never replaced by this call.
+export const useLLMExplanation = (id: string, lang: string, enabled: boolean) =>
+  useQuery({
+    queryKey: ["recommend-llm", id, lang],
+    queryFn: () => api.recommendWithLLM(id, lang),
+    enabled,
+    retry: retryPolicy,
+    staleTime: 10 * 60_000,
+  });
+
+// Appending a transaction changes everything derived from it. Drop the
+// customer's whole cache slice so every screen re-reads.
+export function useAddTransaction(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Parameters<typeof api.createTransaction>[1]) => api.createTransaction(id, body),
+    onSuccess: () => {
+      for (const k of ["features", "distress", "anomalies", "anomalies-all", "recommend", "recommend-llm", "matching", "explain", "simulate", "transactions", "audit"]) {
+        qc.removeQueries({ queryKey: [k, id] });
+      }
+      qc.invalidateQueries({ queryKey: keys.customer(id) });
+    },
+  });
+}
 
 export const useConsent = (id: string) =>
   useQuery({ queryKey: keys.consent(id), queryFn: () => api.consent(id), retry: retryPolicy });

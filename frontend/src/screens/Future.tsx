@@ -29,10 +29,12 @@ export function Future() {
   const [tenure, setTenure] = useState(preTenure);
   const [rate, setRate] = useState(14);
   const [loan, setLoan] = useState<LoanScenario>(preAmount ? { amount: preAmount, tenure: preTenure, rate: 14 } : null);
+  const [months, setMonths] = useState(12);
+  const [pathsN, setPathsN] = useState(1000);
 
   const features = useFeatures(id);
-  const baseline = useSimulation(id, null);
-  const withLoan = useSimulation(id, loan, loan !== null);
+  const baseline = useSimulation(id, null, true, { months, paths: pathsN });
+  const withLoan = useSimulation(id, loan, loan !== null, { months, paths: pathsN });
   const safety = features.data?.features.min_buffer ?? null;
 
   const sim = loan && withLoan.data ? withLoan.data : baseline.data;
@@ -46,11 +48,11 @@ export function Future() {
   const amountLabel = (v: number) => spokenINR(v, lang) ?? formatINR(v);
 
   return (
-    <Layout back={paths.home(id)} title={t("future.title")}>
+    <Layout back={paths.home(id)} title={t("future.title", { n: months })}>
       <div className="flex flex-col gap-6">
         <div>
-          <h1 className="text-2xl font-bold">{t("future.title")}</h1>
-          <p className="text-ink-soft">{t("future.lead")}</p>
+          <h1 className="text-2xl font-bold">{t("future.title", { n: months })}</h1>
+          <p className="text-ink-soft">{t("future.lead", { paths: pathsN.toLocaleString("en-IN") })}</p>
         </div>
 
         {error ? (
@@ -76,10 +78,20 @@ export function Future() {
               <p className="text-sm text-ink-mute">
                 {t("future.methodLead", {
                   method: t(method.method === "ou" ? "future.method.ou" : "future.method.bootstrap"),
-                  paths: "1,000", months: 12,
+                  paths: pathsN.toLocaleString("en-IN"), months,
                 })}
               </p>
             )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <fieldset className="flex flex-col gap-2">
+                <legend className="text-sm font-semibold text-ink-mute">{t("sim.months")}</legend>
+                <ChipGroup name="months" label={t("sim.months")} value={months} options={[6, 12, 24].map((n) => ({ value: n, label: t("enquire.months", { n }) }))} onChange={setMonths} />
+              </fieldset>
+              <fieldset className="flex flex-col gap-2">
+                <legend className="text-sm font-semibold text-ink-mute">{t("sim.paths")}</legend>
+                <ChipGroup name="paths" label={t("sim.paths")} value={pathsN} options={[500, 1000, 2000].map((n) => ({ value: n, label: t("sim.pathsN", { n: n.toLocaleString("en-IN") }) }))} onChange={setPathsN} />
+              </fieldset>
+            </div>
           </>
         )}
 
@@ -130,6 +142,7 @@ function ScenarioCard({ label, scenario, ci, tone }: { label: string; scenario: 
   const light = p < 0.1 ? "safe" : p <= 0.3 ? "care" : "danger";
   const emi = (scenario.parameters as { loan_emi?: number }).loan_emi;
   const c = ci as { p10?: number; p90?: number } | undefined;
+  const lastMonth = Math.max(...Object.keys(scenario.expected_liquidity).map(Number));
   return (
     <Card tone={tone === "accent" ? "accent" : "card"} className="flex flex-col gap-2">
       <div className="font-semibold">{label}</div>
@@ -146,7 +159,7 @@ function ScenarioCard({ label, scenario, ci, tone }: { label: string; scenario: 
         <div className="font-semibold tabular">{t("future.runwayMonths", { months: formatMonths(scenario.expected_runway) })}</div>
       </div>
       <div className="text-sm text-ink-soft tabular">
-        {t("future.at12")}: <Money value={scenario.expected_liquidity["12"]} />
+        {t("future.atMonth", { n: lastMonth })}: <Money value={scenario.expected_liquidity[String(lastMonth)]} />
       </div>
     </Card>
   );

@@ -10,6 +10,7 @@ import { Layout } from "@/ui/Layout";
 import { ErrorState } from "@/ui/ErrorState";
 import { Money as Rs } from "@/ui/Money";
 import { Button, Card, CardSkeleton, ChipGroup } from "@/ui";
+import { AddTransaction } from "./AddTransaction";
 
 const CATEGORIES = ["all", "salary", "rent", "emi", "groceries", "dining", "transport", "shopping", "utilities", "entertainment", "education", "medical", "insurance_premium"];
 const PAGE = 40;
@@ -21,6 +22,7 @@ export function Money() {
   const lang = i18n.language === "en" ? "en" : "hi";
   const { id = "" } = useParams();
   const [category, setCategory] = useState("all");
+  const [range, setRange] = useState<"30" | "90" | "180" | "all">("all");
   const [pages, setPages] = useState(1);
   const [showFlags, setShowFlags] = useState(false);
   const features = useFeatures(id);
@@ -28,6 +30,13 @@ export function Money() {
   const anomalyById = new Map((anomalies.data?.anomalies ?? []).map((a) => [a.transaction_id, a]));
 
   const f = features.data?.features;
+  const snapshot = features.data?.snapshot_date;
+  // start_date relative to the data's own snapshot date, never "today".
+  const startDate = (() => {
+    if (range === "all" || !snapshot) return undefined;
+    const d = new Date(snapshot + "T00:00:00"); d.setDate(d.getDate() - Number(range));
+    return d.toISOString().slice(0, 10);
+  })();
   const catLabel = (c: string) => (c === "all" ? t("money.all") : i18n.exists(`cat.${c}`) ? t(`cat.${c}`) : c.replace(/_/g, " "));
 
   return (
@@ -73,6 +82,14 @@ export function Money() {
           )}
         </Card>
 
+        {snapshot && <AddTransaction customerId={id} snapshotDate={snapshot} />}
+
+        <div className="flex flex-col gap-2">
+          <span className="font-semibold">{t("money.range")}</span>
+          <ChipGroup name="range" label={t("money.range")} value={range}
+            options={(["30", "90", "180", "all"] as const).map((r) => ({ value: r, label: t(`money.range.${r}`) }))}
+            onChange={(r) => { setRange(r); setPages(1); }} />
+        </div>
         <div className="flex flex-col gap-2">
           <span className="font-semibold">{t("money.filter")}</span>
           <ChipGroup name="cat" label={t("money.filter")} value={category}
@@ -80,7 +97,7 @@ export function Money() {
             onChange={(c) => { setCategory(c); setPages(1); }} />
         </div>
 
-        <TxnPages id={id} category={category} pages={pages} anomalyById={anomalyById} lang={lang} catLabel={catLabel} onMore={() => setPages((p) => p + 1)} />
+        <TxnPages id={id} category={category} startDate={startDate} pages={pages} anomalyById={anomalyById} lang={lang} catLabel={catLabel} onMore={() => setPages((p) => p + 1)} />
       </div>
     </Layout>
   );
@@ -132,11 +149,11 @@ function AnomalyRow({ a, lang }: { a: AnomalyItem; lang: "hi" | "en" }) {
   );
 }
 
-function TxnPages({ id, category, pages, anomalyById, lang, catLabel, onMore }: {
-  id: string; category: string; pages: number; anomalyById: Map<string, AnomalyItem>; lang: "hi" | "en"; catLabel: (c: string) => string; onMore: () => void;
+function TxnPages({ id, category, startDate, pages, anomalyById, lang, catLabel, onMore }: {
+  id: string; category: string; startDate?: string; pages: number; anomalyById: Map<string, AnomalyItem>; lang: "hi" | "en"; catLabel: (c: string) => string; onMore: () => void;
 }) {
   const { t } = useTranslation();
-  const first = useTransactions(id, category, 0, PAGE);
+  const first = useTransactions(id, category, 0, PAGE, startDate);
   const total = first.data?.total ?? 0;
   return (
     <div className="flex flex-col gap-3">
@@ -151,7 +168,7 @@ function TxnPages({ id, category, pages, anomalyById, lang, catLabel, onMore }: 
           <p className="text-sm text-ink-mute">{t("money.total", { total })}</p>
           <ul className="divide-y divide-line rounded-2xl border border-line bg-card">
             {first.data.transactions.map((tx) => <TxnRow key={tx.id} tx={tx} anomaly={anomalyById.get(tx.id)} lang={lang} catLabel={catLabel} />)}
-            {Array.from({ length: pages - 1 }, (_, i) => <Page key={i + 1} id={id} category={category} offset={(i + 1) * PAGE} anomalyById={anomalyById} lang={lang} catLabel={catLabel} />)}
+            {Array.from({ length: pages - 1 }, (_, i) => <Page key={i + 1} id={id} category={category} startDate={startDate} offset={(i + 1) * PAGE} anomalyById={anomalyById} lang={lang} catLabel={catLabel} />)}
           </ul>
           {pages * PAGE < total && <Button onClick={onMore} icon={<ChevronDown size={20} aria-hidden />}>{t("money.more")}</Button>}
         </>
@@ -160,8 +177,8 @@ function TxnPages({ id, category, pages, anomalyById, lang, catLabel, onMore }: 
   );
 }
 
-function Page({ id, category, offset, anomalyById, lang, catLabel }: { id: string; category: string; offset: number; anomalyById: Map<string, AnomalyItem>; lang: "hi" | "en"; catLabel: (c: string) => string }) {
-  const q = useTransactions(id, category, offset, PAGE);
+function Page({ id, category, startDate, offset, anomalyById, lang, catLabel }: { id: string; category: string; startDate?: string; offset: number; anomalyById: Map<string, AnomalyItem>; lang: "hi" | "en"; catLabel: (c: string) => string }) {
+  const q = useTransactions(id, category, offset, PAGE, startDate);
   if (!q.data) return <li className="px-4 py-3 text-sm text-ink-mute">…</li>;
   return <>{q.data.transactions.map((tx) => <TxnRow key={tx.id} tx={tx} anomaly={anomalyById.get(tx.id)} lang={lang} catLabel={catLabel} />)}</>;
 }
@@ -169,8 +186,9 @@ function Page({ id, category, offset, anomalyById, lang, catLabel }: { id: strin
 function TxnRow({ tx, anomaly, lang, catLabel }: { tx: TransactionItem; anomaly?: AnomalyItem; lang: "hi" | "en"; catLabel: (c: string) => string }) {
   const { t } = useTranslation();
   const credit = tx.type === "credit";
+  const flagged = tx.is_anomaly || !!anomaly;
   return (
-    <li className={"flex items-center gap-3 px-4 py-3 " + (tx.is_anomaly ? "bg-care-soft/60" : "")}>
+    <li className={"flex items-center gap-3 px-4 py-3 " + (flagged ? "bg-care-soft/60" : "")}>
       <span className={"inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full " + (credit ? "bg-safe-soft text-safe-ink" : "bg-sand text-ink-soft")} aria-hidden>
         {credit ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
       </span>
@@ -180,7 +198,7 @@ function TxnRow({ tx, anomaly, lang, catLabel }: { tx: TransactionItem; anomaly?
           <span>{formatDate(tx.txn_date, lang)}</span>
           <span>· {catLabel(tx.category)}</span>
           {tx.is_recurring && <span className="inline-flex items-center gap-1"><Repeat size={14} aria-hidden /> {t("money.recurring")}</span>}
-          {tx.is_anomaly && <span className="inline-flex items-center gap-1 font-semibold text-care-ink"><AlertTriangle size={14} aria-hidden /> {t("money.unusual")}{anomaly ? ` · ${t("money.score", { score: anomaly.anomaly_score.toFixed(2) })}` : ""}</span>}
+          {flagged && <span className="inline-flex items-center gap-1 font-semibold text-care-ink"><AlertTriangle size={14} aria-hidden /> {t("money.unusual")}{anomaly ? ` · ${t("money.score", { score: anomaly.anomaly_score.toFixed(2) })}` : ""}</span>}
         </span>
       </span>
       <span className={"shrink-0 font-semibold tabular " + (credit ? "text-safe-ink" : "")}>{credit ? "+" : "−"}{formatINR(tx.amount)}</span>

@@ -7,10 +7,11 @@ import { paths } from "@/lib/paths";
 import { Layout } from "@/ui/Layout";
 import { ErrorState } from "@/ui/ErrorState";
 import { Card, CardSkeleton, Toggle } from "@/ui";
+import { formatDateTime } from "@/lib/format";
 
 // S7 — Consent & your data. Toggles are real: revoking breaks the features.
 export function Consent() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { id = "" } = useParams();
   const [params] = useSearchParams();
   const highlight = params.get("scope");
@@ -27,6 +28,9 @@ export function Consent() {
   }, [highlight, consent.data]);
 
   const records = consent.data?.consent_records ?? [];
+  const lang = i18n.language === "en" ? "en" : "hi";
+  const history = (scope: string) => records.filter((r) => r.scope === scope && (r.granted_at || r.revoked_at))
+    .sort((a, b) => (b.granted_at ?? "").localeCompare(a.granted_at ?? ""));
   const byScope = new Map(records.filter((r) => r.active).map((r) => [r.scope, r]));
   const busy = grant.isPending || revoke.isPending;
 
@@ -70,6 +74,19 @@ export function Consent() {
                       </span>
                       {scope === "marketing" && <span className="text-sm text-ink-mute">{t("consent.marketingNote")}</span>}
                       {hl && <span className="text-sm font-semibold text-accent-strong">{t("consent.needed")}</span>}
+                      {history(scope).length > 0 && (
+                        <details className="text-sm text-ink-mute">
+                          <summary className="inline-flex min-h-[32px] cursor-pointer items-center font-semibold">{t("consent.history")}</summary>
+                          <ul className="mt-1 flex flex-col gap-0.5">
+                            {history(scope).map((r) => (
+                              <li key={r.id}>
+                                {r.granted_at && <span>{t("consent.givenAt", { when: formatDateTime(r.granted_at, lang) })}</span>}
+                                {r.revoked_at && <span> · {t("consent.revokedAt", { when: formatDateTime(r.revoked_at, lang) })}</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <Toggle checked={on} disabled={busy} labelledBy={labelId} onChange={(v) => onToggle(scope, v)} />

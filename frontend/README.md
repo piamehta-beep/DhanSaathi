@@ -98,6 +98,18 @@ Then the depth, in any order:
 14. Ask → the **before → after → with counter-offer** table for the three
     gate numbers, and a link into Future pre-filled with that loan.
 15. Welcome → browse all 1,000 customers with persona filter and search.
+16. **Money → "Add a transaction and watch"**: add a ₹45,000 payment to a
+    new merchant, dated inside the data window. The anomaly detector flags
+    it live (score, reasons), and the before/after strip shows the runway
+    and spend moving. This is the only write path in the UI and it is
+    labelled as permanent for that demo customer.
+17. Future → change the horizon (6/12/24 months) and path count
+    (500/1,000/2,000); Suggest → "Explain in plain words (AI)" shows the
+    LLM layer's honest status (off, because data doesn't leave the server);
+    Home → the primary and backup distress models side by side; Your data →
+    grant/revoke history per scope; Trail → filter by event kind.
+18. Welcome → **How does it work?** — the seven-step pipeline, what the
+    system refuses to do, and the backend's validation results.
 
 Things a judge might click off-script, all designed:
 
@@ -190,12 +202,12 @@ src/
               BottomNav, FanChart, SurvivalCurve, BeforeAfter, ScoreBar, Timeline
   screens/    Welcome (S0), Home (S1), Recommend (S2), Banks (S3), Enquire (S4),
               Why (S5), Onboarding (S6), Consent (S7), Future (S8), Money (S9),
-              Trail (S10), BankCards (shared)
+              Trail (S10), About, AddTransaction, BankCards (shared)
 ```
 
-Routes: `/` · `/start` · `/c/:id` · `/c/:id/suggest` · `/c/:id/banks` ·
-`/c/:id/ask` · `/c/:id/why` · `/c/:id/data` · `/c/:id/future` ·
-`/c/:id/money` · `/c/:id/trail`.
+Routes: `/` · `/start` · `/how-it-works` · `/c/:id` · `/c/:id/suggest` ·
+`/c/:id/banks` · `/c/:id/ask` · `/c/:id/why` · `/c/:id/data` ·
+`/c/:id/future` · `/c/:id/money` · `/c/:id/trail`.
 
 ### Backend coverage
 
@@ -216,7 +228,9 @@ Routes: `/` · `/start` · `/c/:id` · `/c/:id/suggest` · `/c/:id/banks` ·
 | `GET /audit/{id}` | Decision trail |
 | consent endpoints | Your data + 403 state |
 | onboarding endpoints | Get started |
-| `POST /dataset/generate`, `POST …/transactions` | admin/write endpoints, intentionally not exposed in a customer UI |
+| `POST /customers/{id}/transactions` | Money → "Add a transaction and watch" (demo write path) |
+| `POST /recommend` with `include_llm_explanation` | Suggest → "Explain in plain words (AI)" |
+| `POST /dataset/generate` | admin-only; intentionally not exposed |
 
 ---
 
@@ -224,8 +238,8 @@ Routes: `/` · `/start` · `/c/:id` · `/c/:id/suggest` · `/c/:id/banks` ·
 
 - `npm test` — `formatINR`, `spokenINR`, `formatPct`, explanation
   humaniser, mode detection.
-- axe (dev-only, `@axe-core/react`) — zero violations on all twelve routes
-  with seeded data.
+- axe (dev-only, `@axe-core/react`) — zero violations on all thirteen
+  routes with seeded data.
 - Every state in the brief triggered deliberately: warm-up, loading,
   offline (fetch failure with cached data and without), 403, 404, empty
   anomalies, empty matching products, 422, reduced motion, 130% font.
