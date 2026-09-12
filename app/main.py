@@ -3,6 +3,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -54,6 +55,16 @@ app.include_router(enquiry.router)
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 if FRONTEND_DIR.is_dir():
     app.mount("/ui", StaticFiles(directory=FRONTEND_DIR, html=True), name="ui")
+
+
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    """Send the root URL somewhere useful.
+
+    Opening localhost:8010 is the first thing anyone does, and a bare 404
+    gives no hint that the app lives at /ui and /docs.
+    """
+    return RedirectResponse(url="/ui/")
 
 
 @app.on_event("startup")
