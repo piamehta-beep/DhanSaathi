@@ -62,11 +62,18 @@ against the safety gate — rather than an abstract score.
 ```
 
 The ordering is the point. Models produce probabilities; they never produce the
-final decision. The optimizer proposes; the safety gate disposes. An LLM layer,
+final decision. The optimizer proposes; the safety gate disposes. The LLM layer,
 if enabled, only rephrases numbers that are already frozen — it never computes
-one. `app/safety/` is kept free of every ML and LLM import, and
-`tests/test_safety_isolation.py` fails the build via AST inspection if that ever
-changes.
+one.
+
+Both isolation properties are enforced mechanically rather than by convention,
+via AST inspection that fails the build:
+
+- `tests/test_safety_isolation.py` — `app/safety/` must import no ML or LLM
+  library, so no model output can reach the gate.
+- `tests/test_llm_isolation.py` — `app/llm/` must import nothing from
+  `app.models`, `app.safety`, `app.services` or `app.features`, so no feedback
+  loop can form from language generation back into the decision.
 
 ---
 
@@ -258,6 +265,13 @@ Things a judge might reasonably poke at, stated up front.
   transparency and tests the question that matters — whether a *non-financial*
   attribute predicts the outcome. `city`, `state`, `age`, and `name` are never
   model features, and a test asserts that.
-- **The LLM vernacular layer and conversational onboarding are not built.** They
-  are the spec's own first two cut candidates. The structured explanation they
-  would rephrase is fully implemented and returned as JSON.
+- **The LLM vernacular layer ships disabled, by policy.** `DATA_LOCALITY=strict`
+  is the default and switches it off outright, because Section 10.4 requires
+  customer data to stay in-region and a hosted model endpoint cannot be assumed
+  to satisfy that. Set `DATA_LOCALITY=regional` plus `OPENAI_API_KEY` only when
+  the configured endpoint genuinely is. With it off, the structured explanation
+  is still returned — the vernacular text is an addition on top, never a
+  replacement. Verified: recommendations are numerically identical with the
+  layer on and off.
+- **Conversational onboarding is not built.** It is the spec's own first cut
+  candidate, and it exercises no part of the mathematical core.
