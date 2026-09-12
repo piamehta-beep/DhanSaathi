@@ -73,6 +73,8 @@ def build_context(
         "merchant": t.merchant,
         "is_recurring": t.is_recurring,
         "is_anomaly": t.is_anomaly,
+        "anomaly_type": t.anomaly_type,
+        "transaction_id": t.id,
     } for t in txns]
     txns_df = pd.DataFrame(rows)
 
