@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     model_version: str = "1.0.0"
     data_locality: str = "strict"
     enforce_consent: bool = True
+    warm_models_on_startup: bool = True
 
     class Config:
         env_file = ".env"

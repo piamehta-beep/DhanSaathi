@@ -114,6 +114,11 @@ uvicorn app.main:app --reload --port 8010
 Then open **http://localhost:8010/ui/** for the review surface, or
 **http://localhost:8010/docs** for the OpenAPI explorer.
 
+The server is ready immediately and trains the Cox and XGBoost models in a
+background thread (~45s). `GET /api/v1/health` reports `models.status` as
+`warming` then `warm`; wait for `warm` before demoing, or the first request
+pays the training cost. Disable with `WARM_MODELS_ON_STARTUP=false`.
+
 > **Apple Silicon note.** XGBoost needs the OpenMP runtime. If `import xgboost`
 > fails with `Library not loaded: @rpath/libomp.dylib`, install it with the
 > **arm64** Homebrew (`/opt/homebrew/bin/brew install libomp`). An x86_64 libomp
@@ -220,6 +225,9 @@ All under `/api/v1`.
 | GET | `/customers/{id}/explain/{rec_id}` | attributions, incl. for vetoes |
 | POST | `/consent`, `GET /customers/{id}/consent`, `POST /consent/{id}/revoke` | DPDP consent |
 | GET | `/audit/{customer_id}` | append-only decision log |
+| POST | `/onboarding/start` | begin vernacular onboarding |
+| POST | `/onboarding/{session_id}/message` | advance the onboarding state machine |
+| GET | `/onboarding/{session_id}` | current onboarding state |
 
 ---
 
@@ -273,5 +281,9 @@ Things a judge might reasonably poke at, stated up front.
   is still returned — the vernacular text is an addition on top, never a
   replacement. Verified: recommendations are numerically identical with the
   layer on and off.
-- **Conversational onboarding is not built.** It is the spec's own first cut
-  candidate, and it exercises no part of the mathematical core.
+- **Onboarding does no real KYC.** The state machine validates *formats* only —
+  PAN pattern, Aadhaar's published Verhoeff checksum, PIN code shape. Nothing
+  contacts UIDAI or the Income Tax Department and no identifier is checked
+  against a real record. Collected identifiers are stored masked and the raw
+  value is discarded, since a prototype has no legitimate reason to retain a
+  government identifier.
