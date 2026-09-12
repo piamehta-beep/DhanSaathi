@@ -51,10 +51,12 @@ app.include_router(onboarding.router)
 app.include_router(enquiry.router)
 
 # Serve the review UI from the API itself so it is same-origin: no CORS
-# negotiation, and no file:// sandbox restrictions on fetch.
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
-if FRONTEND_DIR.is_dir():
-    app.mount("/ui", StaticFiles(directory=FRONTEND_DIR, html=True), name="ui")
+# negotiation, and no file:// sandbox restrictions on fetch. This is the
+# backend's own debugging surface; the product frontend lives in ../frontend
+# and is a separate app.
+REVIEW_UI_DIR = Path(__file__).resolve().parent.parent / "review_ui"
+if REVIEW_UI_DIR.is_dir():
+    app.mount("/ui", StaticFiles(directory=REVIEW_UI_DIR, html=True), name="ui")
 
 
 @app.get("/", include_in_schema=False)

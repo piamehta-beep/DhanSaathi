@@ -15,6 +15,18 @@ against the safety gate — rather than an abstract score.
 
 ---
 
+## Repository layout
+
+```
+backend/    FastAPI + PostgreSQL + models — everything documented below
+frontend/   the product UI (separate app; see FRONTEND_PROMPT.md at the root)
+docker-compose.yml   Postgres, shared by both
+```
+
+All backend commands below are run from **`backend/`**.
+
+---
+
 ## Architecture
 
 ```
@@ -86,17 +98,17 @@ docker compose up -d
 ```
 
 ```bash
-python3.12 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+cd backend && python3.12 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
 ```
 
 ```bash
-cp .env.example .env && source .venv/bin/activate && alembic upgrade head
+cd backend && cp .env.example .env && source .venv/bin/activate && alembic upgrade head
 ```
 
 Seed the data (~7 minutes for the full 1,000 customers):
 
 ```bash
-source .venv/bin/activate \
+cd backend && source .venv/bin/activate \
   && python -m app.synthetic_data.seed --n 1000 --seed 42 \
   && python -m app.synthetic_data.seed_bank_products \
   && python -m app.synthetic_data.seed_consent
@@ -110,10 +122,10 @@ Run the API — **activate the venv first**, in every new terminal, or the
 system Python runs instead and fails with `ModuleNotFoundError: sqlalchemy`:
 
 ```bash
-source .venv/bin/activate && uvicorn app.main:app --reload --port 8010
+cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8010
 ```
 
-Then open **http://localhost:8010/ui/** for the review surface, or
+Then open **http://localhost:8010/ui/** for the backend's review surface (a debugging page, not the product UI), or
 **http://localhost:8010/docs** for the OpenAPI explorer.
 
 ### Integrating a frontend
@@ -155,14 +167,14 @@ pays the training cost. Disable with `WARM_MODELS_ON_STARTUP=false`.
 ### Validation
 
 ```bash
-source .venv/bin/activate && pytest tests/ -q
+cd backend && source .venv/bin/activate && pytest tests/ -q
 ```
 
 The full Section 9.3 sweep across all 1,000 customers is slower and lives
 outside the test loop:
 
 ```bash
-source .venv/bin/activate && python -m scripts.full_sweep
+cd backend && source .venv/bin/activate && python -m scripts.full_sweep
 ```
 
 ---

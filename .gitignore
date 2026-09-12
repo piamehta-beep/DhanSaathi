@@ -1,13 +1,20 @@
+# Python / backend
 __pycache__/
 *.pyc
 .venv/
 venv/
-.env
 *.egg-info/
 .pytest_cache/
+backend/.env
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# OS / tooling
 .DS_Store
 *.log
 .claude/
-
-# Generated API client belongs in the frontend project, not here
-src/api-types.ts
