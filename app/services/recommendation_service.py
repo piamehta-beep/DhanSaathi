@@ -16,7 +16,14 @@ from app.features.context import build_context
 from app.features.pipeline import compute_features
 from app.models.anomaly import max_anomaly_score, score_transactions
 from app.models.cashflow_sim import run_simulation
-from app.models.recommender import Evaluation, match_bank_products, optimize
+from app.models.confidence import bootstrap_shortfall_ci, cbs_confidence
+from app.models.explainer import explain_distress, explain_need_match, narrate
+from app.models.recommender import (
+    Evaluation,
+    match_bank_products,
+    no_action_evaluation,
+    optimize,
+)
 from app.models.survival import predict_distress
 from app.services.audit import record
 
@@ -148,7 +155,31 @@ def recommend(db: Session, customer_id, language: str = "hi", persist: bool = Tr
         age=customer.age,
     )
 
+    # Propagate simulation uncertainty onto CBS and decide whether the
+    # evidence is firm enough to act on at all.
+    if selected.product_type != "no_action" and "_liquidity_paths" in selected.simulation:
+        any_shortfall = (
+            selected.simulation["_liquidity_paths"] < features["min_buffer"]
+        ).any(axis=1)
+        ci = bootstrap_shortfall_ci(any_shortfall, seed=42)
+    else:
+        baseline_p = assessment["baseline"]["p_shortfall_12m"]
+        ci = {"p10": baseline_p, "p90": baseline_p}
+
+    confidence = cbs_confidence(
+        cbs_score=selected.cbs,
+        p_shortfall_ci=ci,
+        data_months=features["data_months"],
+    )
+
+    if not confidence["act"] and selected.product_type != "no_action":
+        selected = no_action_evaluation(assessment["baseline"], {})
+
     status = "recommended" if selected.product_type != "no_action" else "no_action"
+
+    distress_attribution = explain_distress(db, features)
+    need_attribution = explain_need_match(db, features, selected.product_type)
+    explanation = narrate(distress_attribution, need_attribution, selected.product_type)
 
     # When nothing was recommended, surface why the strongest blocked
     # alternative was blocked — "no_action" on its own tells the customer
@@ -178,6 +209,12 @@ def recommend(db: Session, customer_id, language: str = "hi", persist: bool = Tr
         "language": language,
         "candidates_evaluated": len(evaluations),
         "candidates_feasible": sum(1 for e in evaluations if e.gate.is_safe),
+        "confidence_level": confidence["confidence_level"],
+        "confidence_interval": confidence["confidence_interval"],
+        "shap_values": distress_attribution,
+        "need_match_attribution": need_attribution,
+        "explanation": explanation,
+        "llm_explanation": None,
     }
 
     if persist:
@@ -190,11 +227,11 @@ def recommend(db: Session, customer_id, language: str = "hi", persist: bool = Tr
             cbs_components=result["cbs_components"],
             constraints_passed=result["constraints_passed"],
             constraints_failed=result["constraints_failed"],
-            shap_values=[],
+            shap_values=result["shap_values"],
             simulation_summary=result["simulation_summary"],
             distress_probability=result["distress_probability"],
-            confidence_level="high",
-            confidence_interval={},
+            confidence_level=result["confidence_level"],
+            confidence_interval=result["confidence_interval"],
             status=result["status"],
             veto_reason=result["veto_reason"],
             language=language,
