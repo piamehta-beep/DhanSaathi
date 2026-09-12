@@ -13,6 +13,9 @@ const Enquire = lazy(() => import("@/screens/Enquire").then((m) => ({ default: m
 const Why = lazy(() => import("@/screens/Why").then((m) => ({ default: m.Why })));
 const Onboarding = lazy(() => import("@/screens/Onboarding").then((m) => ({ default: m.Onboarding })));
 const Consent = lazy(() => import("@/screens/Consent").then((m) => ({ default: m.Consent })));
+const Future = lazy(() => import("@/screens/Future").then((m) => ({ default: m.Future })));
+const Money = lazy(() => import("@/screens/Money").then((m) => ({ default: m.Money })));
+const Trail = lazy(() => import("@/screens/Trail").then((m) => ({ default: m.Trail })));
 
 const client = new QueryClient({
   queryCache,
@@ -42,6 +45,9 @@ export default function App() {
             <Route path="/c/:id/ask" element={<Enquire />} />
             <Route path="/c/:id/why" element={<Why />} />
             <Route path="/c/:id/data" element={<Consent />} />
+            <Route path="/c/:id/future" element={<Future />} />
+            <Route path="/c/:id/money" element={<Money />} />
+            <Route path="/c/:id/trail" element={<Trail />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

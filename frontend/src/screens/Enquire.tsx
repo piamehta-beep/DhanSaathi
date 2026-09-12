@@ -10,7 +10,11 @@ import { paths } from "@/lib/paths";
 import { Layout, StickyCta } from "@/ui/Layout";
 import { ErrorState } from "@/ui/ErrorState";
 import { Money } from "@/ui/Money";
-import { Button, Card, CheckList, ChipGroup } from "@/ui";
+import { Button, Card, CheckList, ChipGroup, BeforeAfter, type BARow } from "@/ui";
+import { Link } from "react-router-dom";
+import { TrendingUp } from "lucide-react";
+import { dbrLight, runwayLight, distressBand, bandLight } from "@/copy/mapping";
+import { formatMonths } from "@/lib/format";
 import { BankCards } from "./BankCards";
 
 type Askable = Exclude<ProductType, "no_action">;
@@ -139,6 +143,33 @@ export function Enquire() {
   );
 }
 
+// Baseline → assessment (→ counter-offer) for the three gate numbers.
+function BeforeAfterCard({ r, counterLabel }: { r: EnquiryResponse; counterLabel?: string }) {
+  const { t } = useTranslation();
+  const a = r.assessment, b = r.baseline, co = r.counter_offer;
+  const hasCo = !!co && co.amount != null && co.post_dbr != null;
+  const shortLight = (p: number) => bandLight(distressBand(p));
+  const rows: BARow[] = [
+    { label: t("enquire.ba.dbr"), before: formatPct(b.dbr), after: formatPct(a.post_dbr), light: dbrLight(a.post_dbr),
+      extra: hasCo ? { label: counterLabel ?? "", value: formatPct(co!.post_dbr), light: dbrLight(co!.post_dbr!) } : undefined },
+    { label: t("enquire.ba.runway"), before: formatMonths(b.liquidity_runway_months ?? b.expected_runway), after: formatMonths(a.post_runway_months), light: runwayLight(a.post_runway_months),
+      extra: hasCo && co!.post_runway_months != null ? { label: counterLabel ?? "", value: formatMonths(co!.post_runway_months), light: runwayLight(co!.post_runway_months) } : undefined },
+    { label: t("enquire.ba.shortfall"), before: formatPct(b.p_shortfall_12m), after: formatPct(a.post_p_shortfall_12m), light: shortLight(a.post_p_shortfall_12m),
+      extra: hasCo && co!.post_p_shortfall_12m != null ? { label: counterLabel ?? "", value: formatPct(co!.post_p_shortfall_12m), light: shortLight(co!.post_p_shortfall_12m) } : undefined },
+  ];
+  return (
+    <Card className="flex flex-col gap-3">
+      <h2 className="font-bold">{t("enquire.beforeAfter")}</h2>
+      <BeforeAfter rows={rows} beforeLabel={t("enquire.ba.now")} afterLabel={t("enquire.ba.after")} />
+      <p className="text-sm text-ink-mute">{t("enquire.distress", { pct: formatPct(r.distress_probability_12m) })}</p>
+      {r.requested.product_type === "personal_loan" && (
+        <Link to={paths.future(r.customer_id, { amount: r.requested.amount, tenure: r.requested.tenure_months ?? 36 })}
+          className="inline-flex min-h-touch items-center gap-1 font-semibold text-accent-strong hover:underline"><TrendingUp size={18} aria-hidden /> {t("enquire.seeFuture")}</Link>
+      )}
+    </Card>
+  );
+}
+
 function Result({ r, onCheckAmount }: { r: EnquiryResponse; onCheckAmount: (amount: number, tenure: number | null) => void }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language === "en" ? "en" : "hi";
@@ -157,6 +188,7 @@ function Result({ r, onCheckAmount }: { r: EnquiryResponse; onCheckAmount: (amou
           </div>
           <p><Trans i18nKey="enquire.affordable.postDbr" values={{ pct: formatPct(a.post_dbr) }} components={{ 1: <strong /> }} /></p>
         </Card>
+        <BeforeAfterCard r={r} />
         {r.matching_products.length > 0 ? (
           <>
             <h2 className="text-lg font-bold">{t("enquire.banksForThis")}</h2>
@@ -215,6 +247,7 @@ function Result({ r, onCheckAmount }: { r: EnquiryResponse; onCheckAmount: (amou
           <p className="text-ink-soft">{t(vetoNextKey(blockReason))}</p>
         </Card>
       )}
+      <BeforeAfterCard r={r} counterLabel={hasOffer && co ? t("enquire.ba.counter", { amount: formatINR(co.amount!) }) : undefined} />
     </div>
   );
 }

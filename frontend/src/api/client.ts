@@ -24,6 +24,13 @@ export type ConsentRevoked = S["ConsentRevoked"];
 export type HealthResponse = S["HealthResponse"];
 export type OnboardingStartResponse = S["OnboardingStartResponse"];
 export type OnboardingMessageResponse = S["OnboardingMessageResponse"];
+export type SimulateRequest = Partial<S["SimulateRequest"]> & { scenarios: string[] };
+export type SimulateResponse = S["SimulateResponse"];
+export type SimulationScenario = S["SimulationScenario"];
+export type TransactionListResponse = S["TransactionListResponse"];
+export type TransactionItem = S["TransactionItem"];
+export type AuditLogResponse = S["AuditLogResponse"];
+export type AuditLogItem = S["AuditLogItem"];
 
 const BASE = ((import.meta.env.VITE_API_BASE as string | undefined) ?? "").replace(/\/$/, "");
 const API = `${BASE}/api/v1`;
@@ -88,6 +95,13 @@ export const api = {
   distressRisk: (id: string) => request<DistressRiskResponse>(`/customers/${id}/distress-risk`),
   anomalies: (id: string, params: { min_score?: number; limit?: number }) =>
     request<AnomalyListResponse>(`/customers/${id}/anomalies${q(params)}`),
+
+  simulate: (id: string, body: SimulateRequest) =>
+    request<SimulateResponse>(`/customers/${id}/simulate`, { method: "POST", body: JSON.stringify(body) }),
+  transactions: (id: string, params: { category?: string; limit?: number; offset?: number; start_date?: string; end_date?: string }) =>
+    request<TransactionListResponse>(`/customers/${id}/transactions${q(params)}`),
+  audit: (id: string, params: { action?: string; limit?: number; offset?: number }) =>
+    request<AuditLogResponse>(`/audit/${id}${q(params)}`),
 
   recommend: (id: string, language: string) =>
     request<RecommendationResponse>(`/customers/${id}/recommend`, {

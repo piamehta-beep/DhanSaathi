@@ -56,3 +56,24 @@ export function formatDate(iso: string, lang: "hi" | "en"): string {
   if (Number.isNaN(d.getTime())) return iso;
   return new Intl.DateTimeFormat(lang === "hi" ? "hi-IN" : "en-IN", { day: "numeric", month: "long" }).format(d);
 }
+
+// Compact axis labels: ₹75k / ₹1.2L (en), ₹75 हज़ार / ₹1.2 लाख (hi).
+export function formatINRShort(value: number, lang: "hi" | "en"): string {
+  const sign = value < 0 ? "−" : "";
+  const abs = Math.abs(value);
+  if (abs >= 10000000) return `${sign}₹${(abs / 10000000).toFixed(1).replace(/\.0$/, "")} ${lang === "hi" ? "करोड़" : "cr"}`;
+  if (abs >= 100000) return `${sign}₹${(abs / 100000).toFixed(1).replace(/\.0$/, "")} ${lang === "hi" ? "लाख" : "L"}`;
+  if (abs >= 1000) return `${sign}₹${Math.round(abs / 1000)}${lang === "hi" ? " हज़ार" : "k"}`;
+  return `${sign}₹${Math.round(abs)}`;
+}
+
+export function formatDateTime(iso: string, lang: "hi" | "en"): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat(lang === "hi" ? "hi-IN" : "en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).format(d);
+}
+
+export function formatScore(v: number | null | undefined): string {
+  if (v === null || v === undefined || Number.isNaN(v)) return "—";
+  return (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2);
+}

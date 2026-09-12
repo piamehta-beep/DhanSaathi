@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Users, ShieldCheck, RotateCcw } from "lucide-react";
+import { ArrowLeft, Users, ShieldCheck, RotateCcw, ScrollText } from "lucide-react";
+import { BottomNav } from "./BottomNav";
 import { useQueryClient } from "@tanstack/react-query";
 import { LanguageToggle } from "./LanguageToggle";
 import { Banner } from "./Banner";
@@ -45,17 +46,21 @@ export function Layout({ children, back, title }: { children: ReactNode; back?: 
               {t("app.name")}
             </Link>
           )}
-          {title && back && <span className="hidden truncate font-semibold sm:inline">{title}</span>}
+          {title && back && <span className="hidden max-w-[12rem] truncate font-semibold md:inline">{title}</span>}
           <span className="flex-1" />
           {id && (
             <>
-              <Link to={paths.welcome} className="inline-flex min-h-touch items-center gap-1 rounded-xl px-2 text-sm font-semibold text-ink-soft hover:bg-sand">
-                <Users size={22} aria-hidden /> <span className="hidden sm:inline">{t("nav.switchPerson")}</span>
-                <span className="sr-only sm:hidden">{t("nav.switchPerson")}</span>
+              <Link to={paths.welcome} className="inline-flex min-h-touch items-center gap-1 whitespace-nowrap rounded-xl px-2 text-sm font-semibold text-ink-soft hover:bg-sand">
+                <Users size={22} aria-hidden /> <span className="hidden md:inline">{t("nav.switchPerson")}</span>
+                <span className="sr-only md:hidden">{t("nav.switchPerson")}</span>
               </Link>
-              <Link to={paths.data(id)} className="inline-flex min-h-touch items-center gap-1 rounded-xl px-2 text-sm font-semibold text-ink-soft hover:bg-sand">
-                <ShieldCheck size={22} aria-hidden /> <span className="hidden sm:inline">{t("nav.yourData")}</span>
-                <span className="sr-only sm:hidden">{t("nav.yourData")}</span>
+              <Link to={paths.trail(id)} className="inline-flex min-h-touch items-center gap-1 whitespace-nowrap rounded-xl px-2 text-sm font-semibold text-ink-soft hover:bg-sand">
+                <ScrollText size={22} aria-hidden /> <span className="hidden md:inline">{t("nav.trail")}</span>
+                <span className="sr-only md:hidden">{t("nav.trail")}</span>
+              </Link>
+              <Link to={paths.data(id)} className="inline-flex min-h-touch items-center gap-1 whitespace-nowrap rounded-xl px-2 text-sm font-semibold text-ink-soft hover:bg-sand">
+                <ShieldCheck size={22} aria-hidden /> <span className="hidden md:inline">{t("nav.yourData")}</span>
+                <span className="sr-only md:hidden">{t("nav.yourData")}</span>
               </Link>
             </>
           )}
@@ -78,7 +83,8 @@ export function Layout({ children, back, title }: { children: ReactNode; back?: 
           </Banner>
         )}
       </header>
-      <main id="main" className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-8 pt-5 sm:px-6 sm:pt-8">
+      {id && !gone && <BottomNav />}
+      <main id="main" className={"mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pt-5 sm:px-6 sm:pt-8 " + (id ? "pb-24 sm:pb-8" : "pb-8")}>
         {gone ? (
           <>
             <h1 className="sr-only">{t("state.notFound.title")}</h1>
@@ -93,7 +99,7 @@ export function Layout({ children, back, title }: { children: ReactNode; back?: 
 // Bottom-anchored primary action within thumb reach on mobile (brief §8).
 export function StickyCta({ children }: { children: ReactNode }) {
   return (
-    <div className="sticky bottom-0 z-30 -mx-4 mt-6 bg-gradient-to-t from-paper via-paper to-transparent px-4 pt-6 safe-bottom sm:static sm:mx-0 sm:bg-none sm:px-0 sm:pt-0">
+    <div className="sticky bottom-[72px] z-30 -mx-4 mt-6 bg-gradient-to-t from-paper via-paper to-transparent px-4 pb-2 pt-6 sm:static sm:mx-0 sm:bg-none sm:px-0 sm:pb-0 sm:pt-0">
       {children}
     </div>
   );

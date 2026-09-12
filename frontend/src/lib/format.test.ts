@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatINR, spokenINR, formatPct, formatRateBand, formatMonths } from "./format";
+import { formatINR, spokenINR, formatPct, formatRateBand, formatMonths, formatINRShort, formatScore } from "./format";
 
 describe("formatINR", () => {
   it("uses Indian grouping", () => {
@@ -66,5 +66,21 @@ describe("misc", () => {
     expect(formatMonths(2.62)).toBe("2.6");
     expect(formatMonths(6)).toBe("6");
     expect(formatMonths(1.27)).toBe("1.3");
+  });
+});
+
+describe("compact", () => {
+  it("short rupees", () => {
+    expect(formatINRShort(75000, "en")).toBe("₹75k");
+    expect(formatINRShort(120000, "en")).toBe("₹1.2 L");
+    expect(formatINRShort(-18754, "en")).toBe("−₹19k");
+    expect(formatINRShort(500, "en")).toBe("₹500");
+    expect(formatINRShort(200000, "hi")).toBe("₹2 लाख");
+    expect(formatINRShort(75000, "hi")).toBe("₹75 हज़ार");
+  });
+  it("signed scores", () => {
+    expect(formatScore(0.3893)).toBe("+0.39");
+    expect(formatScore(-0.0327)).toBe("−0.03");
+    expect(formatScore(0)).toBe("+0.00");
   });
 });

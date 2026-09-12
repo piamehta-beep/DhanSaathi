@@ -15,6 +15,9 @@ export const keys = {
   matching: (id: string, rec: string) => ["matching", id, rec] as const,
   explain: (id: string, rec: string) => ["explain", id, rec] as const,
   consent: (id: string) => ["consent", id] as const,
+  simulate: (id: string, key: string) => ["simulate", id, key] as const,
+  transactions: (id: string, category: string, offset: number) => ["transactions", id, category, offset] as const,
+  audit: (id: string, offset: number) => ["audit", id, offset] as const,
 };
 
 // Don't retry things that won't change on retry.
@@ -80,6 +83,49 @@ export const useExplain = (id: string, rec: string | undefined) =>
     staleTime: 10 * 60_000,
   });
 
+// Monte Carlo runs are deterministic (seed 42) so they cache well per input.
+export type LoanScenario = { amount: number; tenure: number; rate: number } | null;
+export const useSimulation = (id: string, loan: LoanScenario, enabled = true) => {
+  const body = loan
+    ? { scenarios: ["baseline", "take_loan", "smaller_loan"], loan_amount: loan.amount, loan_tenure_months: loan.tenure, loan_interest_rate: loan.rate }
+    : { scenarios: ["baseline"] };
+  return useQuery({
+    queryKey: keys.simulate(id, JSON.stringify(body)),
+    queryFn: () => api.simulate(id, body),
+    enabled,
+    retry: retryPolicy,
+    staleTime: 30 * 60_000,
+  });
+};
+
+export const useTransactions = (id: string, category: string, offset: number, limit = 40) =>
+  useQuery({
+    queryKey: [...keys.transactions(id, category, offset), limit],
+    queryFn: () => api.transactions(id, { category: category === "all" ? undefined : category, limit, offset }),
+    retry: retryPolicy,
+    placeholderData: (prev) => prev,
+  });
+
+export const useAllAnomalies = (id: string) =>
+  useQuery({ queryKey: ["anomalies-all", id], queryFn: () => api.anomalies(id, { min_score: 0.5, limit: 50 }), retry: retryPolicy });
+
+export const useAudit = (id: string, offset: number, limit = 25) =>
+  useQuery({
+    queryKey: [...keys.audit(id, offset), limit],
+    queryFn: () => api.audit(id, { limit, offset }),
+    retry: retryPolicy,
+    placeholderData: (prev) => prev,
+  });
+
+export const useCustomerPage = (persona: string | undefined, offset: number, limit = 12) =>
+  useQuery({
+    queryKey: ["customers-page", persona ?? "all", offset, limit],
+    queryFn: () => api.customers({ persona, limit, offset }),
+    retry: retryPolicy,
+    staleTime: 10 * 60_000,
+    placeholderData: (prev) => prev,
+  });
+
 export const useConsent = (id: string) =>
   useQuery({ queryKey: keys.consent(id), queryFn: () => api.consent(id), retry: retryPolicy });
 
@@ -99,6 +145,9 @@ export function useConsentMutations(id: string) {
     qc.removeQueries({ queryKey: ["recommend", id] });
     qc.removeQueries({ queryKey: ["matching", id] });
     qc.removeQueries({ queryKey: ["explain", id] });
+    qc.removeQueries({ queryKey: ["simulate", id] });
+    qc.removeQueries({ queryKey: ["audit", id] });
+    qc.removeQueries({ queryKey: ["anomalies-all", id] });
   };
   const grant = useMutation({
     mutationFn: (body: { scope: string; purpose: string }) =>

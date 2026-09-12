@@ -4,7 +4,7 @@ export function Skeleton({ className = "" }: { className?: string }) {
 }
 export function CardSkeleton({ lines = 2 }: { lines?: number }) {
   return (
-    <div className="rounded-2xl border border-line bg-card p-4 flex flex-col gap-3">
+    <div className="flex h-full flex-col gap-3 rounded-2xl border border-line bg-card p-4">
       {Array.from({ length: lines }).map((_, i) => (
         <Skeleton key={i} className={i === 0 ? "h-6 w-3/4" : "h-4 w-1/2"} />
       ))}

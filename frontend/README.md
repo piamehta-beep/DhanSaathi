@@ -80,6 +80,25 @@ Nothing here needs narration. Language is Hindi by default.
 8. Toggle **English** on any screen. Everything switches; amounts stay in
    lakhs.
 
+Then the depth, in any order:
+
+9. **Future** tab → the Monte Carlo fan chart (1,000 paths, p5–p95 band,
+   safety line). Add a ₹2 lakh loan → three scenarios overlaid, shortfall
+   probability with its bootstrap interval, EMI, month-by-month table.
+10. **Money** tab → every transaction with anomaly flags; "N flagged" opens
+    the detector's own reasons and scores.
+11. Header **Decision trail** → the audit log: every decision, its module,
+    the input fingerprint; repeated decisions collapse into "N times, same
+    inputs, same decision".
+12. Home, below the fold → survival curve, hazard-ratio drivers with the
+    model's C-index, and the raw feature vector.
+13. Suggest, below the fold → benefit score on its −1…+1 axis with the
+    confidence interval, the five score components, "your next 12 months if
+    you take this", need-match attribution.
+14. Ask → the **before → after → with counter-offer** table for the three
+    gate numbers, and a link into Future pre-filled with that loan.
+15. Welcome → browse all 1,000 customers with persona filter and search.
+
 Things a judge might click off-script, all designed:
 
 - **आपका डेटा** (shield icon) → turn off "transactions" → go Home → the
@@ -141,6 +160,14 @@ and invalidate every cached query for that customer, so a revoked scope
 produces the real 403 on the next screen. The 403 state reads
 `detail.missing_scopes` and deep-links to the exact toggle.
 
+**Every backend endpoint is on screen.** `/simulate` (Future tab + Home +
+Suggest + Ask), `/distress-risk` in full (survival function, hazard
+ratios, C-index, fallback model), `/transactions` (Money tab),
+`/audit` (Decision trail), `/features` in full (At a glance), the CBS
+score, its components and interval, and the need-match attribution.
+Charts are hand-written SVG sized to the container so text stays at a
+readable size on a phone; no chart library.
+
 **Type scale in rem.** Cheap phones are frequently set to 120–130% system
 font size; every screen was checked at 130% and 360 px.
 
@@ -159,13 +186,37 @@ src/
   lib/        format.ts (+ tests), net.ts (offline store), paths.ts
   locales/    hi.json, en.json — flat, every UI string
   ui/         Button, Card, Chip, StatCard, Toggle, CheckList, BarRow, Banner,
-              ChatBubble, LanguageToggle, Skeleton, Money, ErrorState, Layout
+              ChatBubble, LanguageToggle, Skeleton, Money, ErrorState, Layout,
+              BottomNav, FanChart, SurvivalCurve, BeforeAfter, ScoreBar, Timeline
   screens/    Welcome (S0), Home (S1), Recommend (S2), Banks (S3), Enquire (S4),
-              Why (S5), Onboarding (S6), Consent (S7), BankCards (shared)
+              Why (S5), Onboarding (S6), Consent (S7), Future (S8), Money (S9),
+              Trail (S10), BankCards (shared)
 ```
 
 Routes: `/` · `/start` · `/c/:id` · `/c/:id/suggest` · `/c/:id/banks` ·
-`/c/:id/ask` · `/c/:id/why` · `/c/:id/data`.
+`/c/:id/ask` · `/c/:id/why` · `/c/:id/data` · `/c/:id/future` ·
+`/c/:id/money` · `/c/:id/trail`.
+
+### Backend coverage
+
+| Endpoint | Where |
+|---|---|
+| `GET /health` | warm-up banner on Home |
+| `GET /customers` | Welcome quick-start + full browser (persona filter, search, paging) |
+| `GET /customers/{id}` | header, Home greeting, 404 guard |
+| `GET /customers/{id}/features` | Home stats + At a glance, Money header, safety line on charts |
+| `GET /customers/{id}/distress-risk` | Home (probability, survival curve, hazard ratios, C-index), Why |
+| `GET /customers/{id}/anomalies` | Home (recent), Money (all, with detector reasons) |
+| `GET /customers/{id}/transactions` | Money |
+| `POST /customers/{id}/simulate` | Future (baseline / take_loan / smaller_loan), Home mini chart |
+| `POST /customers/{id}/recommend` | Suggest (three modes, score, components, simulation summary, attributions) |
+| `GET …/matching-products/{rec}` | Banks |
+| `POST /customers/{id}/enquire` | Ask (verdict, counter-offer, before/after, banks) |
+| `GET …/explain/{rec}` | Why (checklist, SHAP bars, need-match, models, CI) |
+| `GET /audit/{id}` | Decision trail |
+| consent endpoints | Your data + 403 state |
+| onboarding endpoints | Get started |
+| `POST /dataset/generate`, `POST …/transactions` | admin/write endpoints, intentionally not exposed in a customer UI |
 
 ---
 
@@ -173,14 +224,14 @@ Routes: `/` · `/start` · `/c/:id` · `/c/:id/suggest` · `/c/:id/banks` ·
 
 - `npm test` — `formatINR`, `spokenINR`, `formatPct`, explanation
   humaniser, mode detection.
-- axe (dev-only, `@axe-core/react`) — zero violations on all nine routes
+- axe (dev-only, `@axe-core/react`) — zero violations on all twelve routes
   with seeded data.
 - Every state in the brief triggered deliberately: warm-up, loading,
   offline (fetch failure with cached data and without), 403, 404, empty
   anomalies, empty matching products, 422, reduced motion, 130% font.
 - Checked at 360, 390, 412 and 1280 px, Hindi and English.
 - Lighthouse mobile (simulated slow 4G, production build): Performance
-  98–99, Accessibility 100, Best Practices 100 on S0, S1, S2 and S4; FCP
-  1.7–1.8 s, TBT 0 ms.
-- Initial JS ≈ 107 KB gzipped (vendor 63 + app 21 + i18n 22); supporting
-  screens are code-split.
+  95–98, Accessibility 100, Best Practices 100 on Welcome, Home, Suggest,
+  Ask, Future and Money; FCP 1.8–2.0 s, TBT ≤ 10 ms, CLS ≤ 0.07.
+- Initial JS ≈ 119 KB gzipped (vendor 64 + app 33 + i18n 22); every
+  screen off the main story path is code-split.

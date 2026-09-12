@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useParams, Link } from "react-router-dom";
-import { HelpCircle, Landmark, Search, Shield, Sparkles, Leaf } from "lucide-react";
+import { HelpCircle, Landmark, Search, Shield, Sparkles, Leaf, TrendingUp, ScrollText } from "lucide-react";
 import { useRecommendation } from "@/api/queries";
 import type { RecommendationResponse } from "@/api/client";
 import { recommendMode, vetoKey, vetoNextKey, KNOWN_VETOS, confidenceKey } from "@/copy/mapping";
@@ -11,7 +11,8 @@ import i18n from "@/i18n";
 import { Layout, StickyCta } from "@/ui/Layout";
 import { ErrorState } from "@/ui/ErrorState";
 import { Money } from "@/ui/Money";
-import { Card, LinkButton, Skeleton, StatusChip } from "@/ui";
+import { Card, LinkButton, Skeleton, StatusChip, ScoreBar, ComponentBars, BarRow } from "@/ui";
+import { formatPct, formatMonths } from "@/lib/format";
 
 // S2 — three distinct visual modes, not one template with the text swapped.
 export function Recommend() {
@@ -107,6 +108,7 @@ function Result({ r, customerId }: { r: RecommendationResponse; customerId: stri
             evaluated: r.candidates_evaluated, feasible: r.candidates_feasible,
           })}
         </p>
+        <Depth r={r} customerId={customerId} />
         <HowWeDecided id={customerId} />
       </div>
     );
@@ -160,7 +162,61 @@ function Result({ r, customerId }: { r: RecommendationResponse; customerId: stri
           </LinkButton>
         </div>
       </StickyCta>
+      <Depth r={r} customerId={customerId} />
       <HowWeDecided id={customerId} />
+    </div>
+  );
+}
+
+// The numbers behind the headline: benefit score with its interval, the
+// five components, the simulation summary, and the need-match attribution.
+function Depth({ r, customerId }: { r: RecommendationResponse; customerId: string }) {
+  const { t } = useTranslation();
+  const comps = r.cbs_components;
+  const items = (["need_match", "affordability_delta", "risk_reduction", "life_stage_align", "distress_delta"] as const)
+    .map((k) => ({ label: t(`rec.comp.${k}`), value: comps[k] }));
+  const ss = r.simulation_summary;
+  const nm = r.need_match_attribution.slice(0, 3);
+  const nmMax = Math.max(0, ...nm.map((a) => Math.abs(a.shap)));
+  const isNone = r.status !== "recommended";
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Card className="flex flex-col gap-3 sm:col-span-2">
+        <div>
+          <h2 className="font-bold">{t("rec.score.title")}</h2>
+          <p className="text-sm text-ink-soft">{t("rec.score.lead")}</p>
+        </div>
+        <ScoreBar score={r.cbs_score} low={r.confidence_interval.cbs_low} high={r.confidence_interval.cbs_high} />
+      </Card>
+      {!isNone && (
+        <Card className="flex flex-col gap-3">
+          <h2 className="font-bold">{t("rec.components.title")}</h2>
+          <ComponentBars items={items} />
+        </Card>
+      )}
+      <Card className="flex flex-col gap-3">
+        <h2 className="font-bold">{isNone ? t("future.baseline") : t("rec.sim.title")}</h2>
+        <dl className="grid grid-cols-2 gap-3 text-sm">
+          <div><dt className="text-ink-mute">{t("rec.sim.shortfall")}</dt><dd className={"text-xl font-bold tabular " + (ss.p_shortfall_12m < 0.1 ? "text-safe-ink" : ss.p_shortfall_12m <= 0.3 ? "text-care-ink" : "text-danger-ink")}>{formatPct(ss.p_shortfall_12m)}</dd></div>
+          <div><dt className="text-ink-mute">{t("rec.sim.runway")}</dt><dd className="text-xl font-bold tabular">{t("future.runwayMonths", { months: formatMonths(ss.expected_runway) })}</dd></div>
+        </dl>
+        {ss.p5_liquidity_12m != null && ss.p95_liquidity_12m != null && (
+          <p className="text-sm text-ink-soft tabular">{t("rec.sim.range", { lo: formatINR(ss.p5_liquidity_12m), hi: formatINR(ss.p95_liquidity_12m) })}</p>
+        )}
+        <Link to={paths.future(customerId, r.product_type === "personal_loan" && r.amount && r.tenure_months ? { amount: r.amount, tenure: r.tenure_months } : undefined)}
+          className="inline-flex min-h-touch items-center gap-1 font-semibold text-accent-strong hover:underline"><TrendingUp size={18} aria-hidden /> {t("rec.sim.link")}</Link>
+      </Card>
+      {nm.length > 0 && !isNone && (
+        <Card className="flex flex-col gap-3 sm:col-span-2">
+          <h2 className="font-bold">{t("rec.needMatch.title")}</h2>
+          <ul className="flex flex-col gap-3">
+            {nm.map((a) => <BarRow key={a.feature} feature={a.feature} shap={a.shap} direction={a.direction} max={nmMax} words={{ up: t("rec.needMatch.up"), down: t("rec.needMatch.down") }} />)}
+          </ul>
+        </Card>
+      )}
+      <Link to={paths.trail(customerId)} className="inline-flex min-h-touch items-center gap-2 text-sm font-semibold text-ink-soft underline-offset-4 hover:underline sm:col-span-2">
+        <ScrollText size={18} aria-hidden /> {t("rec.trail")}
+      </Link>
     </div>
   );
 }
