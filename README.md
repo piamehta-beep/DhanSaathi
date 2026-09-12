@@ -202,6 +202,22 @@ Finish on **matching bank products** for customer 1 or 2 to show the grounding
 layer: three named banks, their published APR bands, computed monthly cost
 cheapest-first, per-bank post-DBR, and a per-product safety-gate result.
 
+**The strongest single moment: let a customer ask for too much.** Use section 5
+of the review UI to request a Rs 5,00,000 personal loan.
+
+- A *young earner* is declined (post-DBR 0.63, C1/C2/C3 fail) and immediately
+  counter-offered the largest amount that does clear every check — plus an
+  honest note when that amount falls below every listed lender's minimum ticket
+  size.
+- An *over-leveraged* customer is declined with `no amount works`, naming the
+  blocking constraint: their existing debt burden already exceeds the ceiling,
+  so the problem is not the size of the request.
+- A customer with recent unresolved anomalous activity is blocked on C6, which
+  tells them the issue is their account activity, not their affordability.
+
+Declining without saying what *is* affordable leaves a customer to guess, and
+guessing usually means asking a lender with fewer scruples.
+
 ---
 
 ## API
@@ -221,6 +237,7 @@ All under `/api/v1`.
 | GET | `/customers/{id}/distress-risk` | survival model output |
 | GET | `/customers/{id}/anomalies` | scored anomalies |
 | POST | `/customers/{id}/recommend` | full pipeline → decision |
+| POST | `/customers/{id}/enquire` | "can I afford X?" + counter-offer |
 | GET | `/customers/{id}/matching-products/{rec_id}` | real bank products |
 | GET | `/customers/{id}/explain/{rec_id}` | attributions, incl. for vetoes |
 | POST | `/consent`, `GET /customers/{id}/consent`, `POST /consent/{id}/revoke` | DPDP consent |
@@ -240,12 +257,14 @@ Things a judge might reasonably poke at, stated up front.
   point values. Every row carries a `source_note` saying so, and `source_url` is
   left blank rather than filled with a page that was never actually verified. A
   fabricated citation would be worse than an honest label.
-- **Personal loans are never recommended.** A borrowing need comes from an
-  expressed funding requirement, and the synthetic dataset contains no such
-  signal, so the need-match model has nothing honest to learn for that class. It
-  scores 0 for personal loans, which must then win on affordability and life-stage
-  alignment alone — and they don't. This is a data limitation, not a modelling
-  claim that loans are always bad.
+- **Personal loans are never *proactively* recommended.** A borrowing need comes
+  from an expressed funding requirement, and the synthetic dataset contains no
+  such signal, so the need-match model has nothing honest to learn for that
+  class. Rather than invent a label, the system covers the direction borrowing
+  need actually comes from: `POST /customers/{id}/enquire` lets the customer ask,
+  and answers with the full safety-gate verdict plus real bank products. The gate
+  is identical either way — asking for credit does not buy a weaker check than
+  being offered it, which a test asserts directly.
 - **Need-match labels encode a designer's prior**, not observed outcomes. The
   dataset has no take-up or satisfaction data. In production these labels would
   be replaced by realised outcomes; the model is deliberately only one weighted

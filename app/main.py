@@ -15,6 +15,7 @@ from app.routers import (
     customers,
     dataset,
     distress,
+    enquiry,
     explain,
     features,
     onboarding,
@@ -45,6 +46,7 @@ app.include_router(recommend.router)
 app.include_router(explain.router)
 app.include_router(consent.router)
 app.include_router(onboarding.router)
+app.include_router(enquiry.router)
 
 # Serve the review UI from the API itself so it is same-origin: no CORS
 # negotiation, and no file:// sandbox restrictions on fetch.
