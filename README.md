@@ -89,8 +89,14 @@ cp .env.example .env && alembic upgrade head
 Seed the data (~7 minutes for the full 1,000 customers):
 
 ```bash
-python -m app.synthetic_data.seed --n 1000 --seed 42 && python -m app.synthetic_data.seed_bank_products
+python -m app.synthetic_data.seed --n 1000 --seed 42 \
+  && python -m app.synthetic_data.seed_bank_products \
+  && python -m app.synthetic_data.seed_consent
 ```
+
+The consent step matters: endpoints that read customer data are consent-gated
+and return **403** without it. Set `ENFORCE_CONSENT=false` in `.env` to bypass
+that while debugging.
 
 Run the API:
 
@@ -136,6 +142,8 @@ Measured on the seeded dataset (seed 42), all targets from spec Section 9.
 | Optimizer | hard-constraint violations (all 1,000) | **0** | 0 |
 | Optimizer | no_action rate | **21.7%** | > 20% |
 | Optimizer | distressed customers declined | **96–100%** | > 80% |
+| Fairness | non-financial attributes in model features | **0** | none |
+| Consent | revocation blocks access immediately | **403** | enforced |
 
 Predicted 12-month distress probability separates the personas cleanly, which is
 the property the safety gate actually depends on:
@@ -195,6 +203,7 @@ All under `/api/v1`.
 | GET | `/customers` | list, filterable by persona |
 | GET | `/customers/{id}` | full customer record |
 | GET | `/customers/{id}/transactions` | transaction history |
+| POST | `/customers/{id}/transactions` | append a transaction |
 | GET | `/customers/{id}/features` | full computed feature vector |
 | POST | `/customers/{id}/simulate` | Monte Carlo scenarios + confidence bands |
 | GET | `/customers/{id}/distress-risk` | survival model output |
@@ -241,6 +250,14 @@ Things a judge might reasonably poke at, stated up front.
   little real signal left to rank *within* one, and the subgroup event counts are
   small. Across the population, which is what the gate consumes, discrimination is
   strong.
+- **Section 10.5's literal fairness rule is not applied as written.** It asks
+  that no persona fall below a 20% recommendation rate, which directly
+  contradicts Sections 9.5 and 10.6 requiring distressed customers to be
+  declined at least 80% of the time. Declining them is the anti-predatory
+  feature, not a bias defect. The audit instead reports per-persona rates for
+  transparency and tests the question that matters — whether a *non-financial*
+  attribute predicts the outcome. `city`, `state`, `age`, and `name` are never
+  model features, and a test asserts that.
 - **The LLM vernacular layer and conversational onboarding are not built.** They
   are the spec's own first two cut candidates. The structured explanation they
   would rephrase is fully implemented and returned as JSON.

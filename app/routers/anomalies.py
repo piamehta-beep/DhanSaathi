@@ -9,11 +9,15 @@ from app.database.models import Anomaly, Customer
 from app.features.context import build_context
 from app.features.pipeline import compute_features
 from app.models.anomaly import score_transactions
+from app.services.consent_guard import SCOPE_ANOMALY_MONITORING, require_consent
 
 router = APIRouter(prefix="/api/v1/customers", tags=["anomalies"])
 
 
-@router.get("/{customer_id}/anomalies")
+@router.get(
+    "/{customer_id}/anomalies",
+    dependencies=[Depends(require_consent(SCOPE_ANOMALY_MONITORING))],
+)
 def get_anomalies(
     customer_id: uuid.UUID,
     start_date: dt.date | None = None,
