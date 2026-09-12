@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { background: theme("colors.paper"); color: theme("colors.ink.DEFAULT"); -webkit-text-size-adjust: 100%; }
+  html[data-lang="hi"] body { line-height: 1.6; }
+  body { @apply font-sans text-base antialiased; min-height: 100dvh; }
+  /* Visible focus everywhere; the browser default is replaced, not removed. */
+  :focus-visible { outline: 2px solid theme("colors.accent.DEFAULT"); outline-offset: 2px; border-radius: 6px; }
+  button, [role="button"] { touch-action: manipulation; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  }
+}
+
+@layer utilities {
+  .tabular { font-variant-numeric: tabular-nums; }
+  .safe-bottom { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+}

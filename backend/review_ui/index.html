@@ -1,0 +1,179 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>DhanSaathi API review</title>
+<h1>DhanSaathi &mdash; API review surface</h1>
+<p>
+  Debugging surface only: every control below hits one API endpoint and dumps
+  the raw JSON. Deliberately unstyled.
+</p>
+
+<label>API base <input id="base" size="40" value="/api/v1"></label>
+<button onclick="health()">health</button>
+
+<hr>
+
+<h2>1. Pick a customer</h2>
+<label>persona
+  <select id="persona">
+    <option value="">(any)</option>
+    <option>stable_salaried</option>
+    <option>young_earner</option>
+    <option>gig_worker</option>
+    <option>near_retirement</option>
+    <option>over_leveraged</option>
+    <option>distressed</option>
+  </select>
+</label>
+<button onclick="listCustomers()">list customers</button>
+<select id="customer" style="width:34em"></select>
+
+<h2>2. Inspect</h2>
+<button onclick="call('/customers/'+cid()+'')">customer</button>
+<button onclick="call('/customers/'+cid()+'/features')">features</button>
+<button onclick="call('/customers/'+cid()+'/transactions?limit=25')">transactions</button>
+<button onclick="call('/customers/'+cid()+'/anomalies?min_score=0.7&limit=25')">anomalies</button>
+<button onclick="call('/customers/'+cid()+'/distress-risk')">distress risk</button>
+<button onclick="call('/audit/'+cid())">audit log</button>
+
+<h2>3. Simulate</h2>
+<label>loan amount <input id="loanAmt" value="200000" size="10"></label>
+<label>tenure <input id="loanTen" value="24" size="4"></label>
+<label>rate % <input id="loanRate" value="12.5" size="5"></label>
+<button onclick="simulate()">simulate baseline vs take_loan</button>
+
+<h2>4. Recommend</h2>
+<button onclick="recommend()">recommend</button>
+<button onclick="matching()">matching bank products</button>
+<button onclick="explain()">explain</button>
+<div>last recommendation id: <code id="recid">(none)</code></div>
+
+<h2>5. Customer asks: "can I afford this?"</h2>
+<label>product
+  <select id="enqProduct">
+    <option>personal_loan</option>
+    <option>credit_card</option>
+    <option>term_insurance</option>
+    <option>mutual_fund_sip</option>
+  </select>
+</label>
+<label>amount <input id="enqAmount" value="500000" size="9"></label>
+<label>tenure <input id="enqTenure" value="36" size="4"></label>
+<button onclick="enquire()">enquire</button>
+
+<h2>6. Consent</h2>
+<label>scope
+  <select id="scope">
+    <option>transaction_analysis</option>
+    <option>product_recommendation</option>
+    <option>credit_assessment</option>
+    <option>anomaly_monitoring</option>
+    <option>marketing</option>
+  </select>
+</label>
+<button onclick="grantConsent()">grant</button>
+<button onclick="call('/customers/'+cid()+'/consent')">list consent</button>
+
+<hr>
+<div id="status"></div>
+<pre id="out">(no request yet)</pre>
+
+<script>
+const $ = id => document.getElementById(id);
+const base = () => $('base').value.replace(/\/$/, '');
+const cid = () => $('customer').value;
+let lastRec = null;
+
+function show(data) { $('out').textContent = JSON.stringify(data, null, 2); }
+function busy(msg) { $('status').textContent = msg; }
+
+async function req(path, opts) {
+  busy('requesting ' + path + ' ...');
+  const started = performance.now();
+  try {
+    const res = await fetch(base() + path, opts);
+    const body = await res.json();
+    busy(`${res.status} ${res.statusText} in ${Math.round(performance.now() - started)}ms`);
+    show(body);
+    return body;
+  } catch (err) {
+    busy('request failed');
+    show({ error: String(err) });
+    return null;
+  }
+}
+
+const call = path => req(path);
+const health = () => req('/health');
+
+async function listCustomers() {
+  const persona = $('persona').value;
+  const body = await req('/customers?limit=50' + (persona ? '&persona=' + persona : ''));
+  if (!body || !body.customers) return;
+  $('customer').innerHTML = body.customers.map(c =>
+    `<option value="${c.id}">${c.persona} | ${c.name} | age ${c.age} | dbr ${c.dbr} | runway ${c.liquidity_runway}</option>`
+  ).join('');
+}
+
+function simulate() {
+  return req('/customers/' + cid() + '/simulate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      scenarios: ['baseline', 'take_loan'],
+      loan_amount: Number($('loanAmt').value),
+      loan_tenure_months: Number($('loanTen').value),
+      loan_interest_rate: Number($('loanRate').value),
+      n_paths: 500,
+      months_projected: 12
+    })
+  });
+}
+
+async function recommend() {
+  const body = await req('/customers/' + cid() + '/recommend', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ language: 'hi', include_llm_explanation: false })
+  });
+  if (body && body.recommendation_id) {
+    lastRec = body.recommendation_id;
+    $('recid').textContent = lastRec;
+  }
+}
+
+function matching() {
+  if (!lastRec) return show({ error: 'run recommend first' });
+  return req('/customers/' + cid() + '/matching-products/' + lastRec);
+}
+
+function explain() {
+  if (!lastRec) return show({ error: 'run recommend first' });
+  return req('/customers/' + cid() + '/explain/' + lastRec);
+}
+
+function enquire() {
+  const tenure = $('enqTenure').value.trim();
+  return req('/customers/' + cid() + '/enquire', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      product_type: $('enqProduct').value,
+      amount: Number($('enqAmount').value),
+      tenure_months: tenure ? Number(tenure) : null
+    })
+  });
+}
+
+function grantConsent() {
+  return req('/consent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      customer_id: cid(),
+      scope: $('scope').value,
+      granted: true,
+      purpose: 'Analyse transactions to assess suitability for banking products'
+    })
+  });
+}
+</script>
