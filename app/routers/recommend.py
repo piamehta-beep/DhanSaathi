@@ -84,6 +84,7 @@ def matching_products(
         sim_inputs=assessment["sim_inputs"],
         distress_state=assessment["distress_state"],
         max_anomaly=assessment["max_anomaly"],
+        age=assessment["customer"].age,
     )
 
     return {
