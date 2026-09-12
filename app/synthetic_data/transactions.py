@@ -164,6 +164,14 @@ def generate_transactions(rng: np.random.Generator, profile: dict) -> tuple[list
             "day_of_month": 10, "start_date": START_DATE, "end_date": None, "active": True,
         })
 
+    base_discretionary_mid = sum(
+        ((cfg["freq"][0] + cfg["freq"][1]) / 2) * ((cfg["amount"][0] + cfg["amount"][1]) / 2)
+        for cfg in DISCRETIONARY_CATEGORIES.values()
+    )
+    target_discretionary = income_mean * (1 - savings_rate) - emi_amount - rent_amount - insurance_amount - sip_amount
+    target_discretionary = max(target_discretionary, income_mean * 0.05)
+    discretionary_scale = float(np.clip(target_discretionary / base_discretionary_mid, 0.1, 3.0))
+
     missed_emi_month = None
     if profile["persona"] in ("over_leveraged", "distressed") and profile.get("distress_event_month"):
         missed_emi_month = profile["distress_event_month"]
@@ -231,7 +239,7 @@ def generate_transactions(rng: np.random.Generator, profile: dict) -> tuple[list
             merchants = MERCHANT_POOLS[category]
             for _ in range(freq):
                 base_amount = float(rng.uniform(*cfg["amount"]))
-                mult = seasonality * _seasonal_multiplier(category, calendar_month)
+                mult = seasonality * _seasonal_multiplier(category, calendar_month) * discretionary_scale
                 amount = round(base_amount * mult, 2)
                 day = int(rng.integers(1, 29))
                 merchant = merchants[rng.integers(0, len(merchants))]

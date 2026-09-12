@@ -14,7 +14,17 @@ import numpy as np
 from sqlalchemy.orm import Session
 
 from app.database.connection import SessionLocal
-from app.database.models import Customer, Loan, RecurringObligation, Transaction
+from app.database.models import (
+    Anomaly,
+    AuditLog,
+    Customer,
+    FeatureSnapshot,
+    Loan,
+    Recommendation,
+    RecurringObligation,
+    SimulationResult,
+    Transaction,
+)
 from app.synthetic_data.anomalies import inject_anomalies
 from app.synthetic_data.personas import assign_personas, generate_customer
 from app.synthetic_data.transactions import generate_transactions
@@ -23,7 +33,18 @@ BATCH_FLUSH_EVERY = 25
 
 
 def clear_existing_data(db: Session) -> None:
-    for model in [Transaction, RecurringObligation, Loan, Customer]:
+    # Order matters: children before the parents they FK to.
+    for model in [
+        AuditLog,
+        Anomaly,
+        SimulationResult,
+        Recommendation,
+        FeatureSnapshot,
+        RecurringObligation,
+        Transaction,
+        Loan,
+        Customer,
+    ]:
         db.query(model).delete()
     db.commit()
 
