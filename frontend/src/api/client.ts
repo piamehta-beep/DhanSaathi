@@ -35,7 +35,15 @@ export type NewTransaction = S["NewTransaction"];
 export type TransactionCreated = S["TransactionCreated"];
 
 const BASE = ((import.meta.env.VITE_API_BASE as string | undefined) ?? "").replace(/\/$/, "");
-const API = `${BASE}/api/v1`;
+const API = BASE.endsWith("/api/v1") ? BASE : `${BASE}/api/v1`;
+
+export type AuthResponse = { access_token: string; token_type: string };
+export type AuthUser = { id: string; email: string; customer_id: string | null };
+export type ManualCustomer = { customer_id: string; created: boolean };
+export type ChatResponse = { reply: string; tool: string | null; data?: Record<string, unknown> };
+export type SupportRequest = { id: string; reason: string; recommendation_id: string | null; message: string; linked_audit_log_id: string | null; status: "open" | "resolved"; created_at: string | null };
+
+const token = () => localStorage.getItem("dhansaathi_token");
 
 export class ApiError extends Error {
   status: number;
@@ -66,7 +74,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(`${API}${path}`, {
       ...init,
-      headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
+      headers: { "content-type": "application/json", ...(token() ? { authorization: `Bearer ${token()}` } : {}), ...(init?.headers ?? {}) },
     });
   } catch {
     throw new NetworkError();
@@ -88,6 +96,23 @@ const q = (params: Record<string, string | number | undefined>) => {
 };
 
 export const api = {
+  signup: (email: string, password: string) =>
+    request<AuthUser>("/auth/signup", { method: "POST", body: JSON.stringify({ email, password }) }),
+  login: (email: string, password: string) =>
+    request<AuthResponse>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+  setupMe: (body: { name: string; age: number; city: string; state: string; monthly_income_mean: number; preferred_language: string }) =>
+    request<ManualCustomer>("/customers/me/setup", { method: "POST", body: JSON.stringify(body) }),
+  addIncome: (body: { amount: number; credit_day: number }) =>
+    request<{ customer_id: string }>("/customers/me/income", { method: "POST", body: JSON.stringify(body) }),
+  addObligation: (body: { amount: number; day_of_month: number; type: "rent" | "emi" | "insurance_premium" | "sip" }) =>
+    request<{ id: string }>("/customers/me/obligations", { method: "POST", body: JSON.stringify(body) }),
+  addManualTransaction: (body: { date: string; amount: number; type: "credit" | "debit"; category: string; merchant: string }) =>
+    request<{ id: string }>("/customers/me/transactions", { method: "POST", body: JSON.stringify(body) }),
+  chat: (body: { customer_id: string; message: string; language: string }) =>
+    request<ChatResponse>("/chat", { method: "POST", body: JSON.stringify(body) }),
+  supportRequests: (id: string) => request<{ customer_id: string; support_requests: SupportRequest[] }>(`/customers/${id}/support-requests`),
+  createSupportRequest: (id: string, body: { reason: string; recommendation_id?: string | null; message: string }) =>
+    request<SupportRequest>(`/customers/${id}/support-request`, { method: "POST", body: JSON.stringify(body) }),
   health: () => request<HealthResponse>("/health"),
 
   customers: (params: { persona?: string; limit?: number; offset?: number }) =>

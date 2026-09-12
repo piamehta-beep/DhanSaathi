@@ -21,3 +21,6 @@ frontend/.env.*
 
 # Frontend build cache
 frontend/tsconfig.tsbuildinfo
+
+# Nested cloned directory
+DhanSaathi/

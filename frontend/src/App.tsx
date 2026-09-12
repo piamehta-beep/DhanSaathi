@@ -6,6 +6,7 @@ import { Welcome } from "@/screens/Welcome";
 import { Home } from "@/screens/Home";
 import { Recommend } from "@/screens/Recommend";
 import { ScreenFallback } from "@/ui/Layout";
+import { Login, OnboardingFlow, Portal } from "@/screens/Portal";
 
 // Story-path screens load eagerly; supporting screens split out.
 const Banks = lazy(() => import("@/screens/Banks").then((m) => ({ default: m.Banks })));
@@ -39,6 +40,17 @@ export default function App() {
         <Suspense fallback={<ScreenFallback />}>
           <Routes>
             <Route path="/" element={<Welcome />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Login signup />} />
+            <Route path="/onboarding" element={<OnboardingFlow />} />
+            <Route path="/dashboard" element={<Portal />} />
+            <Route path="/spending" element={<Portal />} />
+            <Route path="/recommendations" element={<Portal />} />
+            <Route path="/banks" element={<Portal />} />
+            <Route path="/safety" element={<Portal />} />
+            <Route path="/insights" element={<Portal />} />
+            <Route path="/trail" element={<Portal />} />
+            <Route path="/support" element={<Portal />} />
             <Route path="/start" element={<Onboarding />} />
             <Route path="/how-it-works" element={<About />} />
             <Route path="/c/:id" element={<Home />} />
