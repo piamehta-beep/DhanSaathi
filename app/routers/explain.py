@@ -7,11 +7,12 @@ from app.database.connection import get_db
 from app.database.models import Recommendation
 from app.features.pipeline import compute_features
 from app.models.explainer import explain_distress, explain_need_match, narrate
+from app.schemas import ExplainResponse
 
 router = APIRouter(prefix="/api/v1/customers", tags=["explainability"])
 
 
-@router.get("/{customer_id}/explain/{recommendation_id}")
+@router.get("/{customer_id}/explain/{recommendation_id}", response_model=ExplainResponse)
 def explain(customer_id: uuid.UUID, recommendation_id: uuid.UUID, db: Session = Depends(get_db)):
     """Attributions for a recommendation, including a vetoed one.
 

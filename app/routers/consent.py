@@ -7,6 +7,12 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.database.models import AuditLog, ConsentRecord, Customer
+from app.schemas import (
+    AuditLogResponse,
+    ConsentCreated,
+    ConsentListResponse,
+    ConsentRevoked,
+)
 from app.services.audit import record
 
 router = APIRouter(prefix="/api/v1", tags=["consent-and-audit"])
@@ -24,7 +30,7 @@ class ConsentRequest(BaseModel):
     purpose: str
 
 
-@router.post("/consent", status_code=201)
+@router.post("/consent", status_code=201, response_model=ConsentCreated)
 def grant_consent(req: ConsentRequest, db: Session = Depends(get_db)):
     if req.scope not in VALID_SCOPES:
         raise HTTPException(status_code=422, detail={"error": "invalid_scope", "valid": sorted(VALID_SCOPES)})
@@ -56,7 +62,7 @@ def grant_consent(req: ConsentRequest, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/customers/{customer_id}/consent")
+@router.get("/customers/{customer_id}/consent", response_model=ConsentListResponse)
 def list_consent(customer_id: uuid.UUID, db: Session = Depends(get_db)):
     rows = db.query(ConsentRecord).filter(
         ConsentRecord.customer_id == customer_id
@@ -76,7 +82,7 @@ def list_consent(customer_id: uuid.UUID, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/consent/{consent_id}/revoke")
+@router.post("/consent/{consent_id}/revoke", response_model=ConsentRevoked)
 def revoke_consent(consent_id: uuid.UUID, db: Session = Depends(get_db)):
     row = db.query(ConsentRecord).filter(ConsentRecord.id == consent_id).first()
     if not row:
@@ -98,7 +104,7 @@ def revoke_consent(consent_id: uuid.UUID, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/audit/{customer_id}")
+@router.get("/audit/{customer_id}", response_model=AuditLogResponse)
 def get_audit_log(
     customer_id: uuid.UUID,
     action: str | None = None,

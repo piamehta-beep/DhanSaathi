@@ -47,7 +47,20 @@
 <button onclick="explain()">explain</button>
 <div>last recommendation id: <code id="recid">(none)</code></div>
 
-<h2>5. Consent</h2>
+<h2>5. Customer asks: "can I afford this?"</h2>
+<label>product
+  <select id="enqProduct">
+    <option>personal_loan</option>
+    <option>credit_card</option>
+    <option>term_insurance</option>
+    <option>mutual_fund_sip</option>
+  </select>
+</label>
+<label>amount <input id="enqAmount" value="500000" size="9"></label>
+<label>tenure <input id="enqTenure" value="36" size="4"></label>
+<button onclick="enquire()">enquire</button>
+
+<h2>6. Consent</h2>
 <label>scope
   <select id="scope">
     <option>transaction_analysis</option>
@@ -136,6 +149,19 @@ function matching() {
 function explain() {
   if (!lastRec) return show({ error: 'run recommend first' });
   return req('/customers/' + cid() + '/explain/' + lastRec);
+}
+
+function enquire() {
+  const tenure = $('enqTenure').value.trim();
+  return req('/customers/' + cid() + '/enquire', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      product_type: $('enqProduct').value,
+      amount: Number($('enqAmount').value),
+      tenure_months: tenure ? Number(tenure) : null
+    })
+  });
 }
 
 function grantConsent() {

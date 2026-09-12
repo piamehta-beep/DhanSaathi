@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.schemas import HealthResponse
 from app.database.connection import get_db
 from app.routers import (
     anomalies,
@@ -15,11 +16,15 @@ from app.routers import (
     customers,
     dataset,
     distress,
+    enquiry,
     explain,
     features,
+    onboarding,
     recommend,
     simulate,
 )
+from app.services.warmup import start_warmup
+from app.services.warmup import status as warmup_status
 
 app = FastAPI(title="DhanSaathi API", version=settings.model_version)
 
@@ -41,6 +46,8 @@ app.include_router(anomalies.router)
 app.include_router(recommend.router)
 app.include_router(explain.router)
 app.include_router(consent.router)
+app.include_router(onboarding.router)
+app.include_router(enquiry.router)
 
 # Serve the review UI from the API itself so it is same-origin: no CORS
 # negotiation, and no file:// sandbox restrictions on fetch.
@@ -49,7 +56,13 @@ if FRONTEND_DIR.is_dir():
     app.mount("/ui", StaticFiles(directory=FRONTEND_DIR, html=True), name="ui")
 
 
-@app.get("/api/v1/health")
+@app.on_event("startup")
+def _on_startup() -> None:
+    if settings.warm_models_on_startup:
+        start_warmup()
+
+
+@app.get("/api/v1/health", response_model=HealthResponse, tags=["health"])
 def health(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
@@ -61,5 +74,6 @@ def health(db: Session = Depends(get_db)):
         "status": "healthy",
         "database": db_status,
         "model_version": settings.model_version,
+        "models": warmup_status(),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }

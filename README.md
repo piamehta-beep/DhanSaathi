@@ -114,6 +114,36 @@ uvicorn app.main:app --reload --port 8010
 Then open **http://localhost:8010/ui/** for the review surface, or
 **http://localhost:8010/docs** for the OpenAPI explorer.
 
+### Integrating a frontend
+
+Every endpoint declares a typed response schema, so a client can be generated
+straight from the spec:
+
+```bash
+npx openapi-typescript http://localhost:8010/openapi.json -o src/api-types.ts
+```
+
+Notes for whoever builds the UI:
+
+- **Consent gates most endpoints.** Anything reading customer data returns
+  **403** with `{"detail": {"error": "consent_required", "missing_scopes": [...]}}`
+  unless consent is seeded or granted. Every handled error uses that
+  `{"detail": {...}}` shape.
+- **Wait for warm.** `GET /api/v1/health` reports `models.status`; calls made
+  before it reads `warm` pay the one-off training cost.
+- **Run a single worker.** Onboarding sessions and the trained-model cache are
+  per-process, so `--workers 2` would give intermittent session 404s and train
+  the models once per worker.
+- **There is no authentication.** Any client can read any customer. That is
+  acceptable for a prototype and must not reach a real deployment.
+- Typical warm latencies: features 41ms, distress-risk 28ms, recommend 369ms,
+  simulate 73ms, enquire 249ms, customers 72ms.
+
+The server is ready immediately and trains the Cox and XGBoost models in a
+background thread (~45s). `GET /api/v1/health` reports `models.status` as
+`warming` then `warm`; wait for `warm` before demoing, or the first request
+pays the training cost. Disable with `WARM_MODELS_ON_STARTUP=false`.
+
 > **Apple Silicon note.** XGBoost needs the OpenMP runtime. If `import xgboost`
 > fails with `Library not loaded: @rpath/libomp.dylib`, install it with the
 > **arm64** Homebrew (`/opt/homebrew/bin/brew install libomp`). An x86_64 libomp
@@ -197,6 +227,22 @@ Finish on **matching bank products** for customer 1 or 2 to show the grounding
 layer: three named banks, their published APR bands, computed monthly cost
 cheapest-first, per-bank post-DBR, and a per-product safety-gate result.
 
+**The strongest single moment: let a customer ask for too much.** Use section 5
+of the review UI to request a Rs 5,00,000 personal loan.
+
+- A *young earner* is declined (post-DBR 0.63, C1/C2/C3 fail) and immediately
+  counter-offered the largest amount that does clear every check — plus an
+  honest note when that amount falls below every listed lender's minimum ticket
+  size.
+- An *over-leveraged* customer is declined with `no amount works`, naming the
+  blocking constraint: their existing debt burden already exceeds the ceiling,
+  so the problem is not the size of the request.
+- A customer with recent unresolved anomalous activity is blocked on C6, which
+  tells them the issue is their account activity, not their affordability.
+
+Declining without saying what *is* affordable leaves a customer to guess, and
+guessing usually means asking a lender with fewer scruples.
+
 ---
 
 ## API
@@ -216,10 +262,11 @@ All under `/api/v1`.
 | GET | `/customers/{id}/distress-risk` | survival model output |
 | GET | `/customers/{id}/anomalies` | scored anomalies |
 | POST | `/customers/{id}/recommend` | full pipeline → decision |
+| POST | `/customers/{id}/enquire` | "can I afford X?" + counter-offer |
 | GET | `/customers/{id}/matching-products/{rec_id}` | real bank products |
 | GET | `/customers/{id}/explain/{rec_id}` | attributions, incl. for vetoes |
 | POST | `/consent`, `GET /customers/{id}/consent`, `POST /consent/{id}/revoke` | DPDP consent |
 | GET | `/audit/{customer_id}` | append-only decision log |
-
----
-.
+| POST | `/onboarding/start` | begin vernacular onboarding |
+| POST | `/onboarding/{session_id}/message` | advance the onboarding state machine |
+| GET | `/onboarding/{session_id}` | current onboarding state |
