@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.database.models import Customer, Recommendation
 from app.features.context import build_context
 from app.features.pipeline import compute_features
+from app.llm.explainer_llm import generate_explanation, payload_from_recommendation
 from app.models.anomaly import max_anomaly_score, score_transactions
 from app.models.cashflow_sim import run_simulation
 from app.models.confidence import bootstrap_shortfall_ci, cbs_confidence
@@ -138,7 +139,13 @@ def _simulation_summary(selected: Evaluation, baseline: dict) -> dict:
     }
 
 
-def recommend(db: Session, customer_id, language: str = "hi", persist: bool = True) -> dict:
+def recommend(
+    db: Session,
+    customer_id,
+    language: str = "hi",
+    persist: bool = True,
+    include_llm_explanation: bool = False,
+) -> dict:
     assessment = assess_customer(db, customer_id)
     customer = assessment["customer"]
     features = assessment["features"]
@@ -215,7 +222,15 @@ def recommend(db: Session, customer_id, language: str = "hi", persist: bool = Tr
         "need_match_attribution": need_attribution,
         "explanation": explanation,
         "llm_explanation": None,
+        "llm_status": None,
     }
+
+    # Runs last, on a frozen copy of the already-final decision. Whatever it
+    # returns is presentation only — no number above can change as a result.
+    if include_llm_explanation:
+        llm = generate_explanation(payload_from_recommendation(result), language)
+        result["llm_explanation"] = llm["text"]
+        result["llm_status"] = llm["reason"] or "generated"
 
     if persist:
         row = Recommendation(
@@ -234,6 +249,7 @@ def recommend(db: Session, customer_id, language: str = "hi", persist: bool = Tr
             confidence_interval=result["confidence_interval"],
             status=result["status"],
             veto_reason=result["veto_reason"],
+            llm_explanation=result["llm_explanation"],
             language=language,
         )
         db.add(row)

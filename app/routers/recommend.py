@@ -38,7 +38,12 @@ def create_recommendation(
     if not db.query(Customer).filter(Customer.id == customer_id).first():
         raise HTTPException(status_code=404, detail={"error": "customer_not_found"})
 
-    result = recommend(db, customer_id, language=req.language)
+    result = recommend(
+        db,
+        customer_id,
+        language=req.language,
+        include_llm_explanation=req.include_llm_explanation,
+    )
     return _public(result)
 
 
