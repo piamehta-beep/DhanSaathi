@@ -1,7 +1,10 @@
 import datetime as dt
 import uuid
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
@@ -117,4 +120,58 @@ def get_transactions(
             for t in txns
         ],
         "total": total,
+    }
+
+
+class NewTransaction(BaseModel):
+    txn_date: dt.date
+    txn_time: dt.time | None = None
+    amount: float = Field(gt=0, description="Always positive; direction is carried by `type`")
+    type: Literal["credit", "debit"]
+    category: str
+    merchant: str
+    description: str | None = None
+    is_recurring: bool = False
+
+
+@router.post("/{customer_id}/transactions", status_code=201)
+def create_transaction(
+    customer_id: uuid.UUID, txn: NewTransaction, db: Session = Depends(get_db)
+):
+    """Append a transaction.
+
+    Features are recomputed on read rather than cached here, so a new
+    transaction is reflected in the next features/simulate/recommend call
+    without an explicit invalidation step.
+    """
+    if not db.query(Customer).filter(Customer.id == customer_id).first():
+        raise HTTPException(status_code=404, detail={"error": "customer_not_found"})
+
+    row = Transaction(
+        customer_id=customer_id,
+        txn_date=txn.txn_date,
+        txn_time=txn.txn_time,
+        amount=txn.amount,
+        type=txn.type,
+        category=txn.category,
+        merchant=txn.merchant,
+        description=txn.description,
+        is_recurring=txn.is_recurring,
+        is_anomaly=False,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+
+    return {
+        "id": str(row.id),
+        "customer_id": str(customer_id),
+        "txn_date": row.txn_date.isoformat(),
+        "txn_time": row.txn_time.isoformat() if row.txn_time else None,
+        "amount": float(row.amount),
+        "type": row.type,
+        "category": row.category,
+        "merchant": row.merchant,
+        "description": row.description,
+        "is_recurring": row.is_recurring,
     }

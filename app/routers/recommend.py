@@ -7,6 +7,11 @@ from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.database.models import Customer, Recommendation
 from app.models.recommender import match_bank_products
+from app.services.consent_guard import (
+    SCOPE_PRODUCT_RECOMMENDATION,
+    SCOPE_TRANSACTION_ANALYSIS,
+    require_consent,
+)
 from app.services.recommendation_service import assess_customer, recommend
 
 router = APIRouter(prefix="/api/v1/customers", tags=["recommendation"])
@@ -21,7 +26,12 @@ def _public(result: dict) -> dict:
     return {k: v for k, v in result.items() if not k.startswith("_")}
 
 
-@router.post("/{customer_id}/recommend")
+@router.post(
+    "/{customer_id}/recommend",
+    dependencies=[
+        Depends(require_consent(SCOPE_TRANSACTION_ANALYSIS, SCOPE_PRODUCT_RECOMMENDATION))
+    ],
+)
 def create_recommendation(
     customer_id: uuid.UUID, req: RecommendRequest, db: Session = Depends(get_db)
 ):
@@ -32,7 +42,12 @@ def create_recommendation(
     return _public(result)
 
 
-@router.get("/{customer_id}/matching-products/{recommendation_id}")
+@router.get(
+    "/{customer_id}/matching-products/{recommendation_id}",
+    dependencies=[
+        Depends(require_consent(SCOPE_TRANSACTION_ANALYSIS, SCOPE_PRODUCT_RECOMMENDATION))
+    ],
+)
 def matching_products(
     customer_id: uuid.UUID, recommendation_id: uuid.UUID, db: Session = Depends(get_db)
 ):

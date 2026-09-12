@@ -8,11 +8,15 @@ from app.config import settings
 from app.database.connection import get_db
 from app.database.models import Customer
 from app.features.pipeline import compute_features_with_snapshot_date
+from app.services.consent_guard import SCOPE_TRANSACTION_ANALYSIS, require_consent
 
 router = APIRouter(prefix="/api/v1/customers", tags=["features"])
 
 
-@router.get("/{customer_id}/features")
+@router.get(
+    "/{customer_id}/features",
+    dependencies=[Depends(require_consent(SCOPE_TRANSACTION_ANALYSIS))],
+)
 def get_features(
     customer_id: uuid.UUID,
     snapshot_date: dt.date | None = Query(None),
