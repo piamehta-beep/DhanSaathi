@@ -8,9 +8,11 @@ from app.config import settings
 from app.database.connection import get_db
 from app.routers import (
     anomalies,
+    consent,
     customers,
     dataset,
     distress,
+    explain,
     features,
     recommend,
     simulate,
@@ -24,6 +26,8 @@ app.include_router(simulate.router)
 app.include_router(distress.router)
 app.include_router(anomalies.router)
 app.include_router(recommend.router)
+app.include_router(explain.router)
+app.include_router(consent.router)
 
 
 @app.get("/api/v1/health")
