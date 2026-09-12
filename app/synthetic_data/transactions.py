@@ -42,6 +42,11 @@ DISCRETIONARY_CATEGORIES = {
 LOAN_RATE_POOL = [10.5, 11.5, 12.5, 13.5, 14.5]
 LOAN_TENURE_POOL = [24, 36, 48, 60]
 
+# Share of an income drop that a household absorbs by cutting discretionary
+# spending. 0 = spending ignores income entirely, 1 = spending tracks it
+# perfectly; real behaviour sits in between.
+SPEND_ADJUSTMENT_TO_INCOME = 0.6
+
 
 def _month_date(month_idx: int, day: int) -> dt.date:
     year = START_DATE.year + (START_DATE.month - 1 + month_idx - 1) // 12
@@ -65,6 +70,17 @@ def _seasonal_multiplier(category: str, calendar_month: int) -> float:
     if category == "education" and calendar_month in (6, 7):
         mult *= 1.3
     return mult
+
+
+def _mean_seasonal_boost() -> float:
+    """Average of the calendar seasonal multipliers across all categories and
+    months, used to keep realized spending on target once they are applied."""
+    totals = [
+        _seasonal_multiplier(category, month)
+        for category in DISCRETIONARY_CATEGORIES
+        for month in range(1, 13)
+    ]
+    return sum(totals) / len(totals)
 
 
 def _reverse_emi_to_principal(emi: float, annual_rate: float, tenure_months: int) -> float:
@@ -170,7 +186,18 @@ def generate_transactions(rng: np.random.Generator, profile: dict) -> tuple[list
     )
     target_discretionary = income_mean * (1 - savings_rate) - emi_amount - rent_amount - insurance_amount - sip_amount
     target_discretionary = max(target_discretionary, income_mean * 0.05)
-    discretionary_scale = float(np.clip(target_discretionary / base_discretionary_mid, 0.1, 3.0))
+
+    # The per-month seasonality draw and the festival/summer boosts are applied
+    # on top of this scale, so the target must be divided by their expected
+    # value or realized spending overshoots it. Personas with a wide
+    # seasonality range (young earners at 0.8-1.5) overshot the most, which is
+    # why their realized savings rate came out below the persona's target band.
+    expected_seasonality = (seasonality_lo + seasonality_hi) / 2
+    expected_boost = _mean_seasonal_boost()
+    discretionary_scale = float(np.clip(
+        target_discretionary / (base_discretionary_mid * expected_seasonality * expected_boost),
+        0.1, 3.0,
+    ))
 
     missed_emi_month = None
     if profile["persona"] in ("over_leveraged", "distressed") and profile.get("distress_event_month"):
@@ -233,7 +260,14 @@ def generate_transactions(rng: np.random.Generator, profile: dict) -> tuple[list
                 "is_recurring": True, "is_anomaly": False, "anomaly_type": None,
             })
 
-        seasonality = float(rng.uniform(seasonality_lo, seasonality_hi))
+        # Households cut back when income falls, but only partially and with
+        # lag — fixed commitments and habit keep spending elevated for a while.
+        # Without this, a customer whose income drops to 30% keeps spending at
+        # full budget and posts an implausible negative savings rate; with it,
+        # they still overspend their reduced income (which is what creates the
+        # distress) but by a believable margin.
+        spend_response = 1.0 - SPEND_ADJUSTMENT_TO_INCOME * (1.0 - min(income_mult, 1.0))
+        seasonality = float(rng.uniform(seasonality_lo, seasonality_hi)) * spend_response
         for category, cfg in DISCRETIONARY_CATEGORIES.items():
             freq = int(rng.integers(cfg["freq"][0], cfg["freq"][1] + 1))
             merchants = MERCHANT_POOLS[category]
